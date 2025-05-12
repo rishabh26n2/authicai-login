@@ -1,8 +1,7 @@
 from databases import Database
 
 # Fix the connection string (only one @)
-DATABASE_URL = "postgresql+asyncpg://postgres:Pass@54321@localhost/fastapi_logs"
-
+DATABASE_URL = os.getenv("DATABASE_URL")
 database = Database(DATABASE_URL)
 
 async def insert_log(ip_address, location, user_agent):
