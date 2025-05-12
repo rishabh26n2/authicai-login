@@ -285,10 +285,15 @@ async def login(
     password: str = Form(...),
     request: Request = None
 ):
-    # Get real client IP
+    # extract only the first IP from X-Forwarded-For
     ip_header = request.headers.get("x-forwarded-for")
     fallback_ip = request.client.host
-    ip = ip_header or fallback_ip
+    
+    if ip_header:
+        # X-Forwarded-For can be "client1, proxy1, proxy2", take only the client1
+        ip = ip_header.split(",")[0].strip()
+    else:
+        ip = fallback_ip
 
     user_agent = request.headers.get("user-agent", "Unknown")
     location = get_location_from_ip(ip)
