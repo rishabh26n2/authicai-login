@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Login Page</title>
+</head>
+<body>
+  <h2>Login</h2>
+  <form action="/login" method="post">
+    <input type="text" name="username" placeholder="Enter username" required><br><br>
+    <input type="password" name="password" placeholder="Enter password" required><br><br>
+
+    <!-- Hidden fields to send geolocation -->
+    <input type="hidden" name="latitude" id="latitude">
+    <input type="hidden" name="longitude" id="longitude">
+
+    <button type="submit">Login</button>
+  </form>
+
+  <!-- Location Popup JS -->
+  <script>
+    window.onload = function () {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function (position) {
+          document.getElementById("latitude").value = position.coords.latitude;
+          document.getElementById("longitude").value = position.coords.longitude;
+        }, function (error) {
+          alert("Location access denied or failed.");
+        });
+      } else {
+        alert("Geolocation is not supported by this browser.");
+      }
+    };
+  </script>
+
+  {% if message %}
+    <p><strong>{{ message }}</strong></p>
+    <p>Detected Location: {{ location }}</p>
+  {% endif %}
+</body>
+</html>
