@@ -254,7 +254,6 @@
 #     })
 
 
-
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -280,37 +279,42 @@ async def login_form(request: Request):
 # Handle login submission (browser geolocation preferred, IP fallback)
 @app.post("/login")
 async def login(
-    username: str         = Form(...),
-    password: str         = Form(...),
-    latitude: float       = Form(None),
-    longitude: float      = Form(None),
-    request: Request      = None
+    username: str    = Form(...),
+    password: str    = Form(...),
+    latitude: str    = Form(""),   # accept empty by default
+    longitude: str   = Form(""),   # accept empty by default
+    request: Request = None
 ):
-    # 1) Extract client IP
-    raw_xff   = request.headers.get("x-forwarded-for")
-    fallback  = request.client.host
-    ip        = raw_xff.split(",")[0].strip() if raw_xff else fallback
-
-    # 2) Resolve location: browser coords first, else IP
-    if latitude is not None and longitude is not None:
-        location = get_location_from_coordinates(latitude, longitude)
-    else:
-        location = get_location_from_ip(ip)
+    # 1) Extract client IP (first entry of X-Forwarded-For or fallback)
+    raw_xff = request.headers.get("x-forwarded-for")
+    fallback_ip = request.client.host
+    ip = raw_xff.split(",")[0].strip() if raw_xff else fallback_ip
 
     user_agent = request.headers.get("user-agent", "Unknown")
 
-    # 3) Logging
+    # 2) Determine location
+    if latitude != "" and longitude != "":
+        try:
+            lat = float(latitude)
+            lon = float(longitude)
+            location = get_location_from_coordinates(lat, lon)
+        except ValueError:
+            location = get_location_from_ip(ip)
+    else:
+        location = get_location_from_ip(ip)
+
+    # 3) Logging to console
     print("---- Login Attempt ----")
     print("Username:", username)
     print("Final IP Used:", ip)
-    print("Latitude:", latitude, "Longitude:", longitude)
+    print("Latitude field:", repr(latitude), "Longitude field:", repr(longitude))
     print("Location:", location)
     print("User-Agent:", user_agent)
 
-    # 4) Store in DB
+    # 4) Store in database
     await insert_log(ip, location, user_agent)
 
-    # 5) Show result
+    # 5) Render response
     return templates.TemplateResponse("login_xloc.html", {
         "request": request,
         "message": f"Welcome {username}!",
