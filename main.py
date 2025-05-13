@@ -253,12 +253,12 @@
 #         "location": location
 #     })
 
-
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from db import database, insert_log
 from context_collector import get_location_from_ip, get_location_from_coordinates
+from risk_engine import calculate_risk_score, is_suspicious_login  # ← new
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -286,9 +286,9 @@ async def login(
     request: Request = None
 ):
     # 1) Extract client IP (first entry of X-Forwarded-For or fallback)
-    raw_xff = request.headers.get("x-forwarded-for")
+    raw_xff    = request.headers.get("x-forwarded-for")
     fallback_ip = request.client.host
-    ip = raw_xff.split(",")[0].strip() if raw_xff else fallback_ip
+    ip         = raw_xff.split(",")[0].strip() if raw_xff else fallback_ip
 
     user_agent = request.headers.get("user-agent", "Unknown")
 
@@ -303,20 +303,28 @@ async def login(
     else:
         location = get_location_from_ip(ip)
 
-    # 3) Logging to console
+    # 3) Compute risk
+    risk_score    = calculate_risk_score(ip, location, user_agent)
+    is_suspicious = is_suspicious_login(risk_score)
+
+    # 4) Logging to console
     print("---- Login Attempt ----")
-    print("Username:", username)
-    print("Final IP Used:", ip)
-    print("Latitude field:", repr(latitude), "Longitude field:", repr(longitude))
-    print("Location:", location)
-    print("User-Agent:", user_agent)
+    print("Username:       ", username)
+    print("Final IP Used:  ", ip)
+    print("Latitude field: ", repr(latitude), "Longitude field:", repr(longitude))
+    print("Location:       ", location)
+    print("User-Agent:     ", user_agent)
+    print("Risk Score:     ", risk_score)
+    print("Is Suspicious:  ", is_suspicious)
 
-    # 4) Store in database
-    await insert_log(ip, location, user_agent)
+    # 5) Store in database (now with is_suspicious flag)
+    await insert_log(ip, location, user_agent, is_suspicious)
 
-    # 5) Render response
+    # 6) Render response
     return templates.TemplateResponse("login_xloc.html", {
         "request": request,
-        "message": f"Welcome {username}!",
-        "location": location
+        "message":       f"Welcome {username}!",
+        "location":      location,
+        "risk_score":    risk_score,      # you can display this if you like
+        "is_suspicious": is_suspicious
     })

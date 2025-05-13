@@ -1,18 +1,34 @@
 import os
 from databases import Database
 
-# Fix the connection string (only one @)
+# Read the database URL from environment
 DATABASE_URL = os.getenv("DATABASE_URL")
 database = Database(DATABASE_URL)
 
-async def insert_log(ip_address, location, user_agent):
+async def insert_log(ip_address: str,
+                     location: str,
+                     user_agent: str,
+                     is_suspicious: bool = False):
+    """
+    Insert a login attempt into request_logs, including whether
+    it was flagged as suspicious.
+    """
     query = """
-    INSERT INTO request_logs (ip_address, location, user_agent)
-    VALUES (:ip_address, :location, :user_agent)
+    INSERT INTO request_logs (
+      ip_address,
+      location,
+      user_agent,
+      is_suspicious
+    ) VALUES (
+      :ip_address,
+      :location,
+      :user_agent,
+      :is_suspicious
+    )
     """
     await database.execute(query, values={
-        "ip_address": ip_address,
-        "location": location,
-        "user_agent": user_agent
+        "ip_address":    ip_address,
+        "location":      location,
+        "user_agent":    user_agent,
+        "is_suspicious": is_suspicious
     })
-
