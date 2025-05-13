@@ -5,11 +5,38 @@
 </head>
 <body>
   <h2>Login</h2>
-  <form action="/login" method="post">
+  <form id="login-form" action="/login" method="post">
     <input type="text" name="username" placeholder="Enter username" required><br><br>
     <input type="password" name="password" placeholder="Enter password" required><br><br>
-    <button type="submit">Login</button>
+
+    <!-- Hidden fields for browser geolocation -->
+    <input type="hidden" name="latitude" id="latitude">
+    <input type="hidden" name="longitude" id="longitude">
+
+    <button type="submit" id="submit-btn">Login</button>
   </form>
+
+  <script>
+    const btn = document.getElementById("submit-btn");
+    btn.disabled = true;
+
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          document.getElementById("latitude").value  = pos.coords.latitude;
+          document.getElementById("longitude").value = pos.coords.longitude;
+          btn.disabled = false;
+        },
+        err => {
+          console.warn("Geolocation denied/failed:", err.message);
+          btn.disabled = false;  // fallback to IP-based
+        }
+      );
+    } else {
+      console.warn("Geolocation not supported");
+      btn.disabled = false;
+    }
+  </script>
 
   {% if message %}
     <p><strong>{{ message }}</strong></p>

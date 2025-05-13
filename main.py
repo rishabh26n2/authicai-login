@@ -255,12 +255,11 @@
 
 
 
-
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from db import database, insert_log
-from context_collector import get_location_from_ip
+from context_collector import get_location_from_ip, get_location_from_coordinates
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -278,37 +277,40 @@ async def shutdown():
 async def login_form(request: Request):
     return templates.TemplateResponse("login_xloc.html", {"request": request})
 
-# Handle login submission (IP-based only)
+# Handle login submission (browser geolocation preferred, IP fallback)
 @app.post("/login")
 async def login(
-    username: str = Form(...),
-    password: str = Form(...),
-    request: Request = None
+    username: str         = Form(...),
+    password: str         = Form(...),
+    latitude: float       = Form(None),
+    longitude: float      = Form(None),
+    request: Request      = None
 ):
-    # extract only the first IP from X-Forwarded-For
-    ip_header = request.headers.get("x-forwarded-for")
-    fallback_ip = request.client.host
-    
-    if ip_header:
-        # X-Forwarded-For can be "client1, proxy1, proxy2", take only the client1
-        ip = ip_header.split(",")[0].strip()
+    # 1) Extract client IP
+    raw_xff   = request.headers.get("x-forwarded-for")
+    fallback  = request.client.host
+    ip        = raw_xff.split(",")[0].strip() if raw_xff else fallback
+
+    # 2) Resolve location: browser coords first, else IP
+    if latitude is not None and longitude is not None:
+        location = get_location_from_coordinates(latitude, longitude)
     else:
-        ip = fallback_ip
+        location = get_location_from_ip(ip)
 
     user_agent = request.headers.get("user-agent", "Unknown")
-    location = get_location_from_ip(ip)
 
-    # Log attempt
+    # 3) Logging
     print("---- Login Attempt ----")
     print("Username:", username)
-    print("x-forwarded-for Header:", ip_header)
-    print("Fallback IP:", fallback_ip)
     print("Final IP Used:", ip)
+    print("Latitude:", latitude, "Longitude:", longitude)
     print("Location:", location)
     print("User-Agent:", user_agent)
 
+    # 4) Store in DB
     await insert_log(ip, location, user_agent)
 
+    # 5) Show result
     return templates.TemplateResponse("login_xloc.html", {
         "request": request,
         "message": f"Welcome {username}!",
