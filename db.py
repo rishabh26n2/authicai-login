@@ -5,24 +5,33 @@ from databases import Database
 DATABASE_URL = os.getenv("DATABASE_URL")
 database = Database(DATABASE_URL)
 
-async def insert_log(ip_address: str,
-                     location: str,
-                     user_agent: str,
-                     is_suspicious: bool = False):
+async def insert_log(
+    ip_address: str,
+    location: str,
+    user_agent: str,
+    risk_score: int = 0,
+    is_suspicious: bool = False
+):
     """
-    Insert a login attempt into request_logs, including whether
-    it was flagged as suspicious.
+    Insert a login attempt into request_logs, recording:
+      - ip_address
+      - location
+      - user_agent
+      - numeric risk_score (0–100)
+      - boolean is_suspicious flag
     """
     query = """
     INSERT INTO request_logs (
       ip_address,
       location,
       user_agent,
+      risk_score,
       is_suspicious
     ) VALUES (
       :ip_address,
       :location,
       :user_agent,
+      :risk_score,
       :is_suspicious
     )
     """
@@ -30,5 +39,6 @@ async def insert_log(ip_address: str,
         "ip_address":    ip_address,
         "location":      location,
         "user_agent":    user_agent,
+        "risk_score":    risk_score,
         "is_suspicious": is_suspicious
     })

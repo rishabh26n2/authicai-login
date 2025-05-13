@@ -258,7 +258,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from db import database, insert_log
 from context_collector import get_location_from_ip, get_location_from_coordinates
-from risk_engine import calculate_risk_score, is_suspicious_login  # ← new
+from risk_engine import calculate_risk_score, is_suspicious_login
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -285,7 +285,7 @@ async def login(
     longitude: str   = Form(""),   # accept empty by default
     request: Request = None
 ):
-    # 1) Extract client IP (first entry of X-Forwarded-For or fallback)
+    # 1) Extract client IP (first of X-Forwarded-For or fallback)
     raw_xff    = request.headers.get("x-forwarded-for")
     fallback_ip = request.client.host
     ip         = raw_xff.split(",")[0].strip() if raw_xff else fallback_ip
@@ -293,7 +293,7 @@ async def login(
     user_agent = request.headers.get("user-agent", "Unknown")
 
     # 2) Determine location
-    if latitude != "" and longitude != "":
+    if latitude and longitude:
         try:
             lat = float(latitude)
             lon = float(longitude)
@@ -317,14 +317,14 @@ async def login(
     print("Risk Score:     ", risk_score)
     print("Is Suspicious:  ", is_suspicious)
 
-    # 5) Store in database (now with is_suspicious flag)
-    await insert_log(ip, location, user_agent, is_suspicious)
+    # 5) Store in database (with risk_score & flag)
+    await insert_log(ip, location, user_agent, risk_score, is_suspicious)
 
     # 6) Render response
     return templates.TemplateResponse("login_xloc.html", {
-        "request": request,
+        "request":       request,
         "message":       f"Welcome {username}!",
         "location":      location,
-        "risk_score":    risk_score,      # you can display this if you like
+        "risk_score":    risk_score,
         "is_suspicious": is_suspicious
     })
