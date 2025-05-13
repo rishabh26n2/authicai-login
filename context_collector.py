@@ -35,21 +35,28 @@ def get_location_from_ip(ip_address: str) -> str:
         return "Unknown Location"
 
 def get_location_from_coordinates(lat: float, lon: float) -> str:
+    """
+    Reverse-geocode GPS coords into the most specific location possible.
+    Tries: city → town → village → hamlet → municipality → county → suburb → state → Unknown
+    """
     try:
         url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
-        headers = {"User-Agent": "AuthicAI/1.0"}  # Required by Nominatim
+        headers = {"User-Agent": "AuthicAI/1.0"}
         response = requests.get(url, headers=headers)
         response.raise_for_status()
         data = response.json()
         address = data.get("address", {})
 
-        # Improved fallback logic
+        # Look for the most precise field available
         city = (
             address.get("city")
             or address.get("town")
             or address.get("village")
-            or address.get("state")
+            or address.get("hamlet")
+            or address.get("municipality")
             or address.get("county")
+            or address.get("suburb")
+            or address.get("state")
             or "Unknown"
         )
         country = address.get("country", "Unknown")
