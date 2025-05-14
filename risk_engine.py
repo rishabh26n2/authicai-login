@@ -1,7 +1,5 @@
-# risk_engine.py
-
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Any
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -41,28 +39,40 @@ def calculate_risk_score(
     if "India" not in location:
         score += 20
 
-    # 3) Suspicious User agents
+    # 3) Suspicious user agents
     ua = user_agent.lower()
     if any(tok in ua for tok in ("curl", "python", "wget")):
         score += 30
 
     # 4) Teleportation check
-    if last_login and curr_coords and curr_time:
+    if last_login and curr_coords:
+        # normalize current time to aware UTC
+        now = curr_time or datetime.now(timezone.utc)
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+
         try:
             last_ts  = last_login["timestamp"]
             last_lat = last_login["latitude"]
             last_lon = last_login["longitude"]
-        except (KeyError, TypeError):
-            # Missing fields or wrong record shape → skip this check
-            pass
+        except Exception:
+            # missing record fields
+            return min(score, 100)
+
+        # normalize last_ts to UTC-aware
+        if last_ts.tzinfo is None:
+            last_ts = last_ts.replace(tzinfo=timezone.utc)
         else:
-            if last_ts and last_lat is not None and last_lon is not None:
-                hours = (curr_time - last_ts).total_seconds() / 3600.0
-                hours = max(hours, 0.01)
-                dist  = haversine(last_lat, last_lon, curr_coords[0], curr_coords[1])
-                speed = dist / hours
-                if speed > 500:
-                    score += 50
+            last_ts = last_ts.astimezone(timezone.utc)
+
+        # ensure we have valid coords
+        if last_ts and last_lat is not None and last_lon is not None:
+            hours = (now - last_ts).total_seconds() / 3600.0
+            hours = max(hours, 0.01)
+            dist  = haversine(last_lat, last_lon, curr_coords[0], curr_coords[1])
+            speed = dist / hours
+            if speed > 500:
+                score += 50
 
     return min(score, 100)
 
