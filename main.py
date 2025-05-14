@@ -256,7 +256,6 @@
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from starlette.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from datetime import datetime
 
@@ -265,10 +264,6 @@ from context_collector import get_location_from_ip, get_location_from_coordinate
 from risk_engine import calculate_risk_score, is_suspicious_login
 
 app = FastAPI()
-
-# Trust the X-Forwarded-For header as set by your upstream proxy (Render/Nginx, etc.)
-app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
-
 templates = Jinja2Templates(directory="templates")
 
 
@@ -295,18 +290,20 @@ async def login(
     simulate_wrong_location: str = Form("0"),
     request: Request             = None
 ):
-    # 1) Determine client IP (now coming from request.client.host)
-    ip_address = request.client.host
+    # 1) Determine client IP
+    xff        = request.headers.get("x-forwarded-for")
+    fallback   = request.client.host
+    ip_address = xff.split(",")[0].strip() if xff else fallback
+
     user_agent = request.headers.get("user-agent", "Unknown")
 
     # 2) Location logic
     curr_coords = None
     if simulate_wrong_location == "1" and latitude and longitude:
-        # forced wrong coords
+        # we forced the wrong coords
         lat, lon = float(latitude), float(longitude)
         location = get_location_from_coordinates(lat, lon)
         curr_coords = (lat, lon)
-
     elif latitude and longitude:
         try:
             lat, lon = float(latitude), float(longitude)
@@ -314,11 +311,10 @@ async def login(
             curr_coords = (lat, lon)
         except ValueError:
             location = get_location_from_ip(ip_address)
-
     else:
         location = get_location_from_ip(ip_address)
 
-    # 3) Fetch previous login for travel anomaly
+    # 3) Fetch previous login for travel anomaly (if you need it)
     last_login = await fetch_last_login(username)
 
     # 4) Compute risk score
@@ -333,7 +329,7 @@ async def login(
     )
     is_susp = is_suspicious_login(risk_score)
 
-    # 5) Debug log
+    # 5) Debug logging
     print("---- Login Attempt ----")
     print("Username:       ", username)
     print("IP Address:     ", ip_address)
@@ -342,7 +338,7 @@ async def login(
     print("Risk Score:     ", risk_score)
     print("Suspicious?:    ", is_susp)
 
-    # 6) Persist
+    # 6) Store everything (including username & coords)
     await insert_log(
         ip_address    = ip_address,
         location      = location,
@@ -354,11 +350,12 @@ async def login(
         longitude     = curr_coords[1] if curr_coords else None
     )
 
-    # 7) Return with feedback
+    # 7) Return the updated form with feedback
     return templates.TemplateResponse("login_xloc.html", {
-        "request":       request,
-        "message":       username,
-        "location":      location,
-        "risk_score":    risk_score,
-        "is_suspicious": is_susp,
+        "request":        request,
+        "message":        username,
+        "location":       location,
+        "risk_score":     risk_score,
+        "is_suspicious":  is_susp,
     })
+
