@@ -1,81 +1,114 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Login Page</title>
+  <meta charset="UTF-8">
+  <title>AuthicAI Adaptive Login</title>
   <style>
     body {
-      font-family: sans-serif;
+      font-family: "Segoe UI", Roboto, sans-serif;
       max-width: 480px;
       margin: 2rem auto;
       padding: 0 1rem;
+      line-height: 1.5;
+      color: #333;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 2rem;
+      color: #0056b3;
+    }
+    header p {
+      margin: .25rem 0 1rem;
+      font-size: .95rem;
+      color: #555;
     }
     form {
       display: flex;
       flex-direction: column;
       gap: 0.75rem;
+      background: #fafafa;
+      padding: 1rem;
+      border: 1px solid #ddd;
+      border-radius: 6px;
     }
     input[type="text"],
     input[type="password"] {
-      padding: 0.5rem;
+      padding: 0.6rem;
       font-size: 1rem;
       width: 100%;
+      border: 1px solid #ccc;
+      border-radius: 4px;
       box-sizing: border-box;
     }
     .checkbox-group {
       display: flex;
       align-items: center;
       gap: 0.5rem;
+      font-size: 0.9rem;
     }
     button {
       padding: 0.75rem;
       font-size: 1rem;
-      background: #007bff;
+      background: #0056b3;
       border: none;
       color: white;
       cursor: pointer;
       border-radius: 4px;
+      transition: background 0.2s;
     }
     button:disabled {
-      background: #aaa;
+      background: #888;
       cursor: not-allowed;
+    }
+    button:hover:not(:disabled) {
+      background: #004494;
     }
     .result {
       margin-top: 1.5rem;
       padding: 1rem;
-      border: 1px solid #ddd;
+      border: 1px solid #ccc;
       border-radius: 6px;
-      background: #f9f9f9;
+      background: #fefefe;
     }
     .result p {
-      margin: 0.4rem 0;
+      margin: 0.5rem 0;
+      font-size: 0.95rem;
     }
     .suspicious-yes {
-      color: #c00;
+      color: #d32f2f;
       font-weight: bold;
     }
     .suspicious-no {
-      color: #080;
+      color: #388e3c;
       font-weight: bold;
     }
   </style>
 </head>
 <body>
-  <h1>Login</h1>
+  <header>
+    <h1>AuthicAI</h1>
+    <p>Adaptive, risk-based authentication powered by AI. <br>
+       We collect your IP &amp; device info to calculate a risk score and adjust login steps dynamically.</p>
+  </header>
+
   <form id="login-form" action="/login" method="post">
-    <input type="text" name="username"   placeholder="Enter username" required />
-    <input type="password" name="password" placeholder="Enter password" required />
+    <input type="text" name="username"   placeholder="Username" required>
+    <input type="password" name="password" placeholder="Password" required>
 
-    <!-- Geolocation fields (hidden) -->
-    <input type="hidden" name="latitude"  id="latitude"  value="" />
-    <input type="hidden" name="longitude" id="longitude" value="" />
+    <!-- Hidden geolocation fields -->
+    <input type="hidden" name="latitude"  id="latitude"  value="">
+    <input type="hidden" name="longitude" id="longitude" value="">
 
-    <!-- Checkbox to force a wrong location -->
+    <!-- Simulate wrong location for testing -->
     <div class="checkbox-group">
-      <input type="checkbox" id="locCheck" />
+      <input type="checkbox" id="locCheck">
       <label for="locCheck">Simulate Wrong Location</label>
     </div>
-    <input type="hidden" name="simulate_wrong_location" id="simulate_wrong_location" value="0" />
+    <input type="hidden" name="simulate_wrong_location" id="simulate_wrong_location" value="0">
 
     <button type="submit" id="submit-btn" disabled>Login</button>
   </form>
@@ -85,7 +118,6 @@
     const locCheck = document.getElementById("locCheck");
     const locFlag  = document.getElementById("simulate_wrong_location");
 
-    // Try to get the user’s real geolocation
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         pos => {
@@ -95,29 +127,22 @@
           }
           btn.disabled = false;
         },
-        _err => {
-          // user denied or failed
-          btn.disabled = false;
-        }
+        () => { btn.disabled = false; }
       );
     } else {
-      // no geolocation API
       btn.disabled = false;
     }
 
-    // If they check the “wrong location” box, override the fields
     locCheck.addEventListener("change", () => {
       if (locCheck.checked) {
-        // Example: Statue of Liberty coords
+        // bogus coords (Statue of Liberty)
         document.getElementById("latitude").value  = 40.6892;
         document.getElementById("longitude").value = -74.0445;
         locFlag.value = "1";
       } else {
-        // clear and let real geo fill in
         document.getElementById("latitude").value  = "";
         document.getElementById("longitude").value = "";
         locFlag.value = "0";
-        // re-fetch real if we already have it
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
             pos => {
@@ -133,7 +158,7 @@
 
   {% if message %}
     <div class="result">
-      <p><strong>Welcome {{ message }}</strong></p>
+      <p><strong>Welcome {{ message }}!</strong></p>
       <p>Detected Location: {{ location }}</p>
       <p>Risk Score: {{ risk_score }}</p>
       <p class="{{ 'suspicious-yes' if is_suspicious else 'suspicious-no' }}">
