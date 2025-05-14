@@ -2,7 +2,7 @@
 
 import math
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Any
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """
@@ -20,9 +20,9 @@ def calculate_risk_score(
     ip: str,
     location: str,
     user_agent: str,
-    last_login: Optional[Dict[str, Any]] = None,
-    curr_time: Optional[datetime]   = None,
-    curr_coords: Optional[tuple]    = None
+    last_login: Optional[Any]    = None,
+    curr_time: Optional[datetime]= None,
+    curr_coords: Optional[tuple] = None
 ) -> int:
     """
     Compute a heuristic risk score (0–100):
@@ -48,23 +48,23 @@ def calculate_risk_score(
 
     # 4) Teleportation check
     if last_login and curr_coords and curr_time:
-        last_ts  = last_login.get("timestamp")
-        last_lat = last_login.get("latitude")
-        last_lon = last_login.get("longitude")
-        # Ensure we have all pieces
-        if last_ts and last_lat is not None and last_lon is not None:
-            now = curr_time
-            hours = (now - last_ts).total_seconds() / 3600.0
-            # protect div by zero
-            hours = max(hours, 0.01)
-            dist = haversine(last_lat, last_lon, curr_coords[0], curr_coords[1])
-            speed = dist / hours
-            # if required speed > 500 km/h, big penalty
-            if speed > 500:
-                score += 50
+        try:
+            last_ts  = last_login["timestamp"]
+            last_lat = last_login["latitude"]
+            last_lon = last_login["longitude"]
+        except (KeyError, TypeError):
+            # Missing fields or wrong record shape → skip this check
+            pass
+        else:
+            if last_ts and last_lat is not None and last_lon is not None:
+                hours = (curr_time - last_ts).total_seconds() / 3600.0
+                hours = max(hours, 0.01)
+                dist  = haversine(last_lat, last_lon, curr_coords[0], curr_coords[1])
+                speed = dist / hours
+                if speed > 500:
+                    score += 50
 
     return min(score, 100)
-
 
 def is_suspicious_login(score: int) -> bool:
     """
