@@ -257,7 +257,9 @@ from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from db import database, insert_log
+from datetime import datetime
+
+from db import database, insert_log, fetch_last_login
 from context_collector import get_location_from_ip, get_location_from_coordinates
 from risk_engine import calculate_risk_score, is_suspicious_login
 
@@ -288,45 +290,61 @@ async def login(
     simulate_suspicious: str      = Form("0"),
     request: Request              = None
 ):
-    # 1) IP extraction
+    # 1) Extract client IP
     raw_xff    = request.headers.get("x-forwarded-for")
     fallback_ip = request.client.host
-    ip = raw_xff.split(",")[0].strip() if raw_xff else fallback_ip
+    ip          = raw_xff.split(",")[0].strip() if raw_xff else fallback_ip
 
     user_agent = request.headers.get("user-agent", "Unknown")
 
-    # 2) Location resolution
+    # 2) Resolve location
     if latitude and longitude:
         try:
-            location = get_location_from_coordinates(float(latitude), float(longitude))
+            lat = float(latitude)
+            lon = float(longitude)
+            location = get_location_from_coordinates(lat, lon)
+            curr_coords = (lat, lon)
         except ValueError:
             location = get_location_from_ip(ip)
+            curr_coords = None
     else:
         location = get_location_from_ip(ip)
+        curr_coords = None
 
-    # 3) Risk scoring (or simulate)
+    # 3) Fetch last login for this user (to check travel anomaly)
+    last_login = await fetch_last_login(username)
+
+    # 4) Compute or force risk
+    now = datetime.utcnow()
     if simulate_suspicious == "1":
         risk_score    = 100
         is_suspicious = True
     else:
-        risk_score    = calculate_risk_score(ip, location, user_agent)
+        risk_score    = calculate_risk_score(
+            ip,
+            location,
+            user_agent,
+            last_login=last_login,
+            curr_time=now,
+            curr_coords=curr_coords
+        )
         is_suspicious = is_suspicious_login(risk_score)
 
-    # 4) Console log
+    # 5) Logging
     print("---- Login Attempt ----")
-    print("Username:          ", username)
-    print("Final IP Used:     ", ip)
-    print("Latitude/Longitude:", latitude, longitude)
-    print("Location:          ", location)
-    print("User-Agent:        ", user_agent)
-    print("Simulate Suspicious:", simulate_suspicious)
-    print("Risk Score:        ", risk_score)
-    print("Is Suspicious:     ", is_suspicious)
+    print("Username:            ", username)
+    print("Final IP Used:       ", ip)
+    print("Latitude/Longitude:  ", latitude, longitude)
+    print("Location:            ", location)
+    print("User-Agent:          ", user_agent)
+    print("Simulate Suspicious: ", simulate_suspicious)
+    print("Risk Score:          ", risk_score)
+    print("Is Suspicious:       ", is_suspicious)
 
-    # 5) Store
+    # 6) Store (now also feeding risk_score & flag)
     await insert_log(ip, location, user_agent, risk_score, is_suspicious)
 
-    # 6) Render back with results
+    # 7) Render with results
     return templates.TemplateResponse("login_xloc.html", {
         "request":       request,
         "message":       f"Welcome {username}!",
