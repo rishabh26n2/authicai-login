@@ -5,10 +5,10 @@
   <style>
     body { font-family: sans-serif; max-width: 480px; margin: 2rem auto; }
     input, button { font-size: 1rem; padding: .5rem; margin: .5rem 0; width: 100%; }
+    .toggles label { display: block; margin: .5rem 0; }
     .result { margin-top: 1.5rem; padding: 1rem; border: 1px solid #ccc; }
     .suspicious { color: red; }
     .not-suspicious { color: green; }
-    label.sim { display: block; margin: 1rem 0; }
   </style>
 </head>
 <body>
@@ -21,39 +21,58 @@
     <input type="hidden" name="latitude"  id="latitude"  value="">
     <input type="hidden" name="longitude" id="longitude" value="">
 
-    <!-- Hidden field to simulate a suspicious login -->
-    <input type="hidden" name="simulate_suspicious" id="simulate_suspicious" value="0">
+    <!-- Hidden flags -->
+    <input type="hidden" name="simulate_suspicious"      id="simulate_suspicious"      value="0">
+    <input type="hidden" name="simulate_wrong_location"  id="simulate_wrong_location"  value="0">
 
-    <!-- Checkbox to toggle simulation -->
-    <label class="sim">
-      <input type="checkbox" id="simCheck">  
-      Simulate Suspicious
-    </label>
+    <div class="toggles">
+      <label><input type="checkbox" id="simCheck"> Simulate Suspicious</label>
+      <label><input type="checkbox" id="locCheck"> Simulate Wrong Location</label>
+    </div>
 
     <button type="submit" id="submit-btn" disabled>Login</button>
   </form>
 
   <script>
-    const btn = document.getElementById("submit-btn");
-    const simCheck = document.getElementById("simCheck");
-    const simField = document.getElementById("simulate_suspicious");
+    const btn         = document.getElementById("submit-btn");
+    const simCheck    = document.getElementById("simCheck");
+    const simField    = document.getElementById("simulate_suspicious");
+    const locCheck    = document.getElementById("locCheck");
+    const locField    = document.getElementById("simulate_wrong_location");
 
-    // Toggle the hidden simulate flag
+    // Toggle simulate_suspicious flag
     simCheck.addEventListener("change", () => {
       simField.value = simCheck.checked ? "1" : "0";
     });
 
-    // Geolocation:
+    // Toggle simulate_wrong_location flag
+    locCheck.addEventListener("change", () => {
+      if (locCheck.checked) {
+        // pick a bogus coordinate, e.g., Statue of Liberty
+        document.getElementById("latitude").value  = 40.6892;
+        document.getElementById("longitude").value = -74.0445;
+        locField.value = "1";
+      } else {
+        // clear so real geolocation will fill in
+        document.getElementById("latitude").value  = "";
+        document.getElementById("longitude").value = "";
+        locField.value = "0";
+      }
+    });
+
+    // Geolocation: fill real coords only if not simulating wrong location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         pos => {
-          document.getElementById("latitude").value  = pos.coords.latitude;
-          document.getElementById("longitude").value = pos.coords.longitude;
+          if (!locCheck.checked) {
+            document.getElementById("latitude").value  = pos.coords.latitude;
+            document.getElementById("longitude").value = pos.coords.longitude;
+          }
           btn.disabled = false;
         },
         err => {
           console.warn("Geolocation denied/failed:", err.message);
-          btn.disabled = false;  // allow fallback
+          btn.disabled = false;
         }
       );
     } else {
