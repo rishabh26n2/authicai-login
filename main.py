@@ -274,57 +274,59 @@ async def shutdown():
     await database.disconnect()
 
 
-# 1) Serve login form
 @app.get("/", response_class=HTMLResponse)
 async def login_form(request: Request):
     return templates.TemplateResponse("login_xloc.html", {"request": request})
 
 
-# 2) Handle form post
 @app.post("/login", response_class=HTMLResponse)
 async def login(
-    username: str    = Form(...),
-    password: str    = Form(...),
-    latitude: str    = Form(""),   # may be empty
-    longitude: str   = Form(""),   # may be empty
-    request: Request = None
+    username: str                 = Form(...),
+    password: str                 = Form(...),
+    latitude: str                 = Form(""),
+    longitude: str                = Form(""),
+    simulate_suspicious: str      = Form("0"),
+    request: Request              = None
 ):
-    # --- Extract client IP (first X-Forwarded-For or direct) ---
+    # 1) IP extraction
     raw_xff    = request.headers.get("x-forwarded-for")
     fallback_ip = request.client.host
     ip = raw_xff.split(",")[0].strip() if raw_xff else fallback_ip
 
     user_agent = request.headers.get("user-agent", "Unknown")
 
-    # --- Determine location: browser coords preferred, else IP-based ---
+    # 2) Location resolution
     if latitude and longitude:
         try:
-            lat = float(latitude)
-            lon = float(longitude)
-            location = get_location_from_coordinates(lat, lon)
+            location = get_location_from_coordinates(float(latitude), float(longitude))
         except ValueError:
             location = get_location_from_ip(ip)
     else:
         location = get_location_from_ip(ip)
 
-    # --- Compute risk score & flag ---
-    risk_score    = calculate_risk_score(ip, location, user_agent)
-    is_suspicious = is_suspicious_login(risk_score)
+    # 3) Risk scoring (or simulate)
+    if simulate_suspicious == "1":
+        risk_score    = 100
+        is_suspicious = True
+    else:
+        risk_score    = calculate_risk_score(ip, location, user_agent)
+        is_suspicious = is_suspicious_login(risk_score)
 
-    # --- Log to console for debugging ---
+    # 4) Console log
     print("---- Login Attempt ----")
-    print("Username:       ", username)
-    print("Final IP Used:  ", ip)
-    print("Latitude field: ", repr(latitude), "Longitude field:", repr(longitude))
-    print("Location:       ", location)
-    print("User-Agent:     ", user_agent)
-    print("Risk Score:     ", risk_score)
-    print("Is Suspicious:  ", is_suspicious)
+    print("Username:          ", username)
+    print("Final IP Used:     ", ip)
+    print("Latitude/Longitude:", latitude, longitude)
+    print("Location:          ", location)
+    print("User-Agent:        ", user_agent)
+    print("Simulate Suspicious:", simulate_suspicious)
+    print("Risk Score:        ", risk_score)
+    print("Is Suspicious:     ", is_suspicious)
 
-    # --- Store in database (now with risk_score & flag) ---
+    # 5) Store
     await insert_log(ip, location, user_agent, risk_score, is_suspicious)
 
-    # --- Render the same form with feedback ---
+    # 6) Render back with results
     return templates.TemplateResponse("login_xloc.html", {
         "request":       request,
         "message":       f"Welcome {username}!",
