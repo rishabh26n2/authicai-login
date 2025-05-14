@@ -291,30 +291,29 @@ async def login(
     request: Request              = None
 ):
     # 1) Extract client IP
-    raw_xff    = request.headers.get("x-forwarded-for")
+    raw_xff     = request.headers.get("x-forwarded-for")
     fallback_ip = request.client.host
     ip          = raw_xff.split(",")[0].strip() if raw_xff else fallback_ip
 
     user_agent = request.headers.get("user-agent", "Unknown")
 
-    # 2) Resolve location
+    # 2) Determine location & current coords
+    curr_coords = None
     if latitude and longitude:
         try:
             lat = float(latitude)
             lon = float(longitude)
-            location = get_location_from_coordinates(lat, lon)
+            location    = get_location_from_coordinates(lat, lon)
             curr_coords = (lat, lon)
         except ValueError:
-            location = get_location_from_ip(ip)
-            curr_coords = None
+            location    = get_location_from_ip(ip)
     else:
         location = get_location_from_ip(ip)
-        curr_coords = None
 
-    # 3) Fetch last login for this user (to check travel anomaly)
+    # 3) Fetch last login for this user
     last_login = await fetch_last_login(username)
 
-    # 4) Compute or force risk
+    # 4) Compute risk score (or force if simulating)
     now = datetime.utcnow()
     if simulate_suspicious == "1":
         risk_score    = 100
@@ -330,7 +329,7 @@ async def login(
         )
         is_suspicious = is_suspicious_login(risk_score)
 
-    # 5) Logging
+    # 5) Console log for debugging
     print("---- Login Attempt ----")
     print("Username:            ", username)
     print("Final IP Used:       ", ip)
@@ -341,10 +340,19 @@ async def login(
     print("Risk Score:          ", risk_score)
     print("Is Suspicious:       ", is_suspicious)
 
-    # 6) Store (now also feeding risk_score & flag)
-    await insert_log(ip, location, user_agent, risk_score, is_suspicious)
+    # 6) Persist into DB (now including username, latitude, longitude)
+    await insert_log(
+        ip_address    = ip,
+        location      = location,
+        user_agent    = user_agent,
+        risk_score    = risk_score,
+        is_suspicious = is_suspicious,
+        username      = username,
+        latitude      = curr_coords[0] if curr_coords else None,
+        longitude     = curr_coords[1] if curr_coords else None
+    )
 
-    # 7) Render with results
+    # 7) Render response with feedback
     return templates.TemplateResponse("login_xloc.html", {
         "request":       request,
         "message":       f"Welcome {username}!",
