@@ -2,25 +2,31 @@
 <html>
 <head>
   <title>Login Page</title>
+  <style>
+    body { font-family: sans-serif; max-width: 480px; margin: 2rem auto; }
+    input, button { font-size: 1rem; padding: .5rem; margin: .5rem 0; width: 100%; }
+    .result { margin-top: 1.5rem; padding: 1rem; border: 1px solid #ccc; }
+    .suspicious { color: red; }
+    .not-suspicious { color: green; }
+  </style>
 </head>
 <body>
   <h2>Login</h2>
   <form id="login-form" action="/login" method="post">
-    <input type="text" name="username" placeholder="Enter username" required><br><br>
-    <input type="password" name="password" placeholder="Enter password" required><br><br>
+    <input type="text"   name="username"   placeholder="Enter username" required>
+    <input type="password" name="password" placeholder="Enter password" required>
 
     <!-- Hidden fields for browser geolocation -->
-    <input type="hidden" name="latitude" id="latitude">
-    <input type="hidden" name="longitude" id="longitude">
+    <input type="hidden" name="latitude"  id="latitude"  value="">
+    <input type="hidden" name="longitude" id="longitude" value="">
 
-    <button type="submit" id="submit-btn">Login</button>
+    <button type="submit" id="submit-btn" disabled>Login</button>
   </form>
 
   <script>
     const btn = document.getElementById("submit-btn");
-    btn.disabled = true;
-
-    if ("geolocation" in navigator) {
+    // Try to get geolocation first
+    if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         pos => {
           document.getElementById("latitude").value  = pos.coords.latitude;
@@ -29,18 +35,25 @@
         },
         err => {
           console.warn("Geolocation denied/failed:", err.message);
-          btn.disabled = false;  // fallback to IP-based
+          // enable anyway (we'll fall back to IP)
+          btn.disabled = false;
         }
       );
     } else {
-      console.warn("Geolocation not supported");
+      console.warn("Geolocation not supported by this browser");
       btn.disabled = false;
     }
   </script>
 
   {% if message %}
-    <p><strong>{{ message }}</strong></p>
-    <p>Detected Location: {{ location }}</p>
+    <div class="result">
+      <p><strong>{{ message }}</strong></p>
+      <p>Detected Location: {{ location }}</p>
+      <p>Risk Score: {{ risk_score }}</p>
+      <p class="{{ 'suspicious' if is_suspicious else 'not-suspicious' }}">
+        Suspicious? {{ 'YES' if is_suspicious else 'No' }}
+      </p>
+    </div>
   {% endif %}
 </body>
 </html>

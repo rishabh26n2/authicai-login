@@ -256,12 +256,14 @@
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+
 from db import database, insert_log
 from context_collector import get_location_from_ip, get_location_from_coordinates
 from risk_engine import calculate_risk_score, is_suspicious_login
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
+
 
 @app.on_event("startup")
 async def startup():
@@ -271,28 +273,30 @@ async def startup():
 async def shutdown():
     await database.disconnect()
 
-# Serve login form
+
+# 1) Serve login form
 @app.get("/", response_class=HTMLResponse)
 async def login_form(request: Request):
     return templates.TemplateResponse("login_xloc.html", {"request": request})
 
-# Handle login submission (browser geolocation preferred, IP fallback)
-@app.post("/login")
+
+# 2) Handle form post
+@app.post("/login", response_class=HTMLResponse)
 async def login(
     username: str    = Form(...),
     password: str    = Form(...),
-    latitude: str    = Form(""),   # accept empty by default
-    longitude: str   = Form(""),   # accept empty by default
+    latitude: str    = Form(""),   # may be empty
+    longitude: str   = Form(""),   # may be empty
     request: Request = None
 ):
-    # 1) Extract client IP (first of X-Forwarded-For or fallback)
+    # --- Extract client IP (first X-Forwarded-For or direct) ---
     raw_xff    = request.headers.get("x-forwarded-for")
     fallback_ip = request.client.host
-    ip         = raw_xff.split(",")[0].strip() if raw_xff else fallback_ip
+    ip = raw_xff.split(",")[0].strip() if raw_xff else fallback_ip
 
     user_agent = request.headers.get("user-agent", "Unknown")
 
-    # 2) Determine location
+    # --- Determine location: browser coords preferred, else IP-based ---
     if latitude and longitude:
         try:
             lat = float(latitude)
@@ -303,11 +307,11 @@ async def login(
     else:
         location = get_location_from_ip(ip)
 
-    # 3) Compute risk
+    # --- Compute risk score & flag ---
     risk_score    = calculate_risk_score(ip, location, user_agent)
     is_suspicious = is_suspicious_login(risk_score)
 
-    # 4) Logging to console
+    # --- Log to console for debugging ---
     print("---- Login Attempt ----")
     print("Username:       ", username)
     print("Final IP Used:  ", ip)
@@ -317,10 +321,10 @@ async def login(
     print("Risk Score:     ", risk_score)
     print("Is Suspicious:  ", is_suspicious)
 
-    # 5) Store in database (with risk_score & flag)
+    # --- Store in database (now with risk_score & flag) ---
     await insert_log(ip, location, user_agent, risk_score, is_suspicious)
 
-    # 6) Render response
+    # --- Render the same form with feedback ---
     return templates.TemplateResponse("login_xloc.html", {
         "request":       request,
         "message":       f"Welcome {username}!",
