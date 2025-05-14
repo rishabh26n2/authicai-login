@@ -1,66 +1,91 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
   <title>Login Page</title>
   <style>
-    body { font-family: sans-serif; max-width: 480px; margin: 2rem auto; }
-    input, button { font-size: 1rem; padding: .5rem; margin: .5rem 0; width: 100%; }
-    .toggles label { display: block; margin: .5rem 0; }
-    .result { margin-top: 1.5rem; padding: 1rem; border: 1px solid #ccc; }
-    .suspicious { color: red; }
-    .not-suspicious { color: green; }
+    body {
+      font-family: sans-serif;
+      max-width: 480px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    input[type="text"],
+    input[type="password"] {
+      padding: 0.5rem;
+      font-size: 1rem;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    button {
+      padding: 0.75rem;
+      font-size: 1rem;
+      background: #007bff;
+      border: none;
+      color: white;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    button:disabled {
+      background: #aaa;
+      cursor: not-allowed;
+    }
+    .result {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: #f9f9f9;
+    }
+    .result p {
+      margin: 0.4rem 0;
+    }
+    .suspicious-yes {
+      color: #c00;
+      font-weight: bold;
+    }
+    .suspicious-no {
+      color: #080;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
-  <h2>Login</h2>
+  <h1>Login</h1>
   <form id="login-form" action="/login" method="post">
-    <input type="text"   name="username"   placeholder="Enter username" required>
-    <input type="password" name="password" placeholder="Enter password" required>
+    <input type="text" name="username"   placeholder="Enter username" required />
+    <input type="password" name="password" placeholder="Enter password" required />
 
-    <!-- Hidden fields for browser geolocation -->
-    <input type="hidden" name="latitude"  id="latitude"  value="">
-    <input type="hidden" name="longitude" id="longitude" value="">
+    <!-- Geolocation fields (hidden) -->
+    <input type="hidden" name="latitude"  id="latitude"  value="" />
+    <input type="hidden" name="longitude" id="longitude" value="" />
 
-    <!-- Hidden flags -->
-    <input type="hidden" name="simulate_suspicious"      id="simulate_suspicious"      value="0">
-    <input type="hidden" name="simulate_wrong_location"  id="simulate_wrong_location"  value="0">
-
-    <div class="toggles">
-      <label><input type="checkbox" id="simCheck"> Simulate Suspicious</label>
-      <label><input type="checkbox" id="locCheck"> Simulate Wrong Location</label>
+    <!-- Checkbox to force a wrong location -->
+    <div class="checkbox-group">
+      <input type="checkbox" id="locCheck" />
+      <label for="locCheck">Simulate Wrong Location</label>
     </div>
+    <input type="hidden" name="simulate_wrong_location" id="simulate_wrong_location" value="0" />
 
     <button type="submit" id="submit-btn" disabled>Login</button>
   </form>
 
   <script>
-    const btn         = document.getElementById("submit-btn");
-    const simCheck    = document.getElementById("simCheck");
-    const simField    = document.getElementById("simulate_suspicious");
-    const locCheck    = document.getElementById("locCheck");
-    const locField    = document.getElementById("simulate_wrong_location");
+    const btn      = document.getElementById("submit-btn");
+    const locCheck = document.getElementById("locCheck");
+    const locFlag  = document.getElementById("simulate_wrong_location");
 
-    // Toggle simulate_suspicious flag
-    simCheck.addEventListener("change", () => {
-      simField.value = simCheck.checked ? "1" : "0";
-    });
-
-    // Toggle simulate_wrong_location flag
-    locCheck.addEventListener("change", () => {
-      if (locCheck.checked) {
-        // pick a bogus coordinate, e.g., Statue of Liberty
-        document.getElementById("latitude").value  = 40.6892;
-        document.getElementById("longitude").value = -74.0445;
-        locField.value = "1";
-      } else {
-        // clear so real geolocation will fill in
-        document.getElementById("latitude").value  = "";
-        document.getElementById("longitude").value = "";
-        locField.value = "0";
-      }
-    });
-
-    // Geolocation: fill real coords only if not simulating wrong location
+    // Try to get the user’s real geolocation
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         pos => {
@@ -70,24 +95,49 @@
           }
           btn.disabled = false;
         },
-        err => {
-          console.warn("Geolocation denied/failed:", err.message);
+        _err => {
+          // user denied or failed
           btn.disabled = false;
         }
       );
     } else {
-      console.warn("Geolocation not supported");
+      // no geolocation API
       btn.disabled = false;
     }
+
+    // If they check the “wrong location” box, override the fields
+    locCheck.addEventListener("change", () => {
+      if (locCheck.checked) {
+        // Example: Statue of Liberty coords
+        document.getElementById("latitude").value  = 40.6892;
+        document.getElementById("longitude").value = -74.0445;
+        locFlag.value = "1";
+      } else {
+        // clear and let real geo fill in
+        document.getElementById("latitude").value  = "";
+        document.getElementById("longitude").value = "";
+        locFlag.value = "0";
+        // re-fetch real if we already have it
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            pos => {
+              document.getElementById("latitude").value  = pos.coords.latitude;
+              document.getElementById("longitude").value = pos.coords.longitude;
+            },
+            () => {}
+          );
+        }
+      }
+    });
   </script>
 
   {% if message %}
     <div class="result">
-      <p><strong>{{ message }}</strong></p>
+      <p><strong>Welcome {{ message }}</strong></p>
       <p>Detected Location: {{ location }}</p>
       <p>Risk Score: {{ risk_score }}</p>
-      <p class="{{ 'suspicious' if is_suspicious else 'not-suspicious' }}">
-        Suspicious? {{ 'YES' if is_suspicious else 'No' }}
+      <p class="{{ 'suspicious-yes' if is_suspicious else 'suspicious-no' }}">
+        Suspicious? {{ 'Yes' if is_suspicious else 'No' }}
       </p>
     </div>
   {% endif %}
