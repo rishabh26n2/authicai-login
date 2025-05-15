@@ -71,6 +71,6 @@ def calculate_risk_score(
 
 def is_suspicious_login(score: int) -> bool:
     """
-    Flag logins with score >= 60 as suspicious.
+    Flag logins with score >= 50 (any teleport anomaly or higher) as suspicious.
     """
-    return score >= 60
+    return score >= 50
