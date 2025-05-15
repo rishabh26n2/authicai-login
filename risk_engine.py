@@ -54,6 +54,7 @@ def calculate_risk_score(
             last_lon = last_login["longitude"]
         except Exception:
             last_ts = last_lat = last_lon = None
+
         if last_ts and last_lat is not None and last_lon is not None:
             if last_ts.tzinfo is None:
                 last_ts = last_ts.replace(tzinfo=timezone.utc)
@@ -64,8 +65,15 @@ def calculate_risk_score(
                 score += 50
 
     # 2) Country change check
-    if last_login and last_login.get("location"):
-        last_country = extract_country(last_login["location"])
+    # Safely extract last location string from record
+    last_loc_str = None
+    if last_login:
+        try:
+            last_loc_str = last_login["location"]
+        except Exception:
+            last_loc_str = None
+    if last_loc_str:
+        last_country = extract_country(last_loc_str)
         curr_country = extract_country(location)
         if last_country and curr_country and last_country != curr_country:
             score += 20
