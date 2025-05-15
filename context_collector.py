@@ -16,51 +16,50 @@ API_KEY = "cd656120f01ff045bff14d33bb81b432"  # (temporary fix)
 #         print("Geo API Error:", str(e))
 #         return "Unknown Location"
 
-def get_location_from_ip(ip_address: str) -> str:
+def get_location_from_ip(ip_address: str):
+    """
+    Returns a tuple: (location_str, (latitude, longitude)).
+    """
     try:
-        r = requests.get(f"{GEOLOCATION_API_URL}{ip_address}?access_key={API_KEY}")
-        r.raise_for_status()
-        data = r.json()
-
-        # If IPStack says "batch_not_supported_on_plan", bail out
+        resp = requests.get(
+            f"{IPSTACK_URL}{ip_address}",
+            params={"access_key": API_KEY}
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        # Handle unsupported batch plan response
         if data.get("success") is False and data.get("error", {}).get("code") == 303:
-            return "Unknown Location"
+            return "Unknown Location", (None, None)
 
         city = data.get("city")
         country = data.get("country_name")
-        if city and country:
-            return f"{city}, {country}"
-        return "Unknown Location"
+        lat = data.get("latitude")
+        lon = data.get("longitude")
+        loc_str = f"{city}, {country}" if city and country else country or city or "Unknown Location"
+        return loc_str, (lat, lon)
     except requests.RequestException:
-        return "Unknown Location"
+        return "Unknown Location", (None, None)
+
 
 def get_location_from_coordinates(lat: float, lon: float) -> str:
     """
-    Reverse-geocode GPS coords into the most specific location possible.
-    Tries: city → town → village → hamlet → municipality → county → suburb → state → Unknown
+    Reverse-geocode GPS coords into a human-readable location.
     """
     try:
-        url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
+        url = (
+            f"https://nominatim.openstreetmap.org/reverse?format=json"
+            f"&lat={lat}&lon={lon}"
+        )
         headers = {"User-Agent": "AuthicAI/1.0"}
         response = requests.get(url, headers=headers)
         response.raise_for_status()
         data = response.json()
         address = data.get("address", {})
-
-        # Look for the most precise field available
         city = (
-            address.get("city")
-            or address.get("town")
-            or address.get("village")
-            or address.get("hamlet")
-            or address.get("municipality")
-            or address.get("county")
-            or address.get("suburb")
-            or address.get("state")
-            or "Unknown"
+            address.get("city") or address.get("town") or address.get("village")
+            or address.get("hamlet") or address.get("county") or address.get("state")
         )
-        country = address.get("country", "Unknown")
-        return f"{city}, {country}"
-    except Exception as e:
-        print("Reverse geolocation failed:", e)
+        country = address.get("country")
+        return f"{city}, {country}" if city and country else "Unknown Location"
+    except Exception:
         return "Unknown Location"

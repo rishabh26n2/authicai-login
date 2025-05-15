@@ -266,7 +266,6 @@ from risk_engine import calculate_risk_score, is_suspicious_login
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
-
 @app.on_event("startup")
 async def startup():
     await database.connect()
@@ -275,49 +274,43 @@ async def startup():
 async def shutdown():
     await database.disconnect()
 
-
 @app.get("/", response_class=HTMLResponse)
 async def login_form(request: Request):
     return templates.TemplateResponse("login_xloc.html", {"request": request})
 
-
 @app.post("/login", response_class=HTMLResponse)
 async def login(
-    username: str                = Form(...),
-    password: str                = Form(...),
-    latitude: str                = Form(""),
-    longitude: str               = Form(""),
+    username: str = Form(...),
+    password: str = Form(...),
+    latitude: float = Form(None),
+    longitude: float = Form(None),
     simulate_wrong_location: str = Form("0"),
-    request: Request             = None
+    request: Request = None
 ):
     # 1) Determine client IP
-    xff        = request.headers.get("x-forwarded-for")
-    fallback   = request.client.host
+    xff = request.headers.get("x-forwarded-for")
+    fallback = request.client.host
     ip_address = xff.split(",")[0].strip() if xff else fallback
-
     user_agent = request.headers.get("user-agent", "Unknown")
 
-    # 2) Location logic
-    curr_coords = None
-    if simulate_wrong_location == "1" and latitude and longitude:
-        # we forced the wrong coords
-        lat, lon = float(latitude), float(longitude)
-        location = get_location_from_coordinates(lat, lon)
-        curr_coords = (lat, lon)
-    elif latitude and longitude:
-        try:
-            lat, lon = float(latitude), float(longitude)
-            location = get_location_from_coordinates(lat, lon)
-            curr_coords = (lat, lon)
-        except ValueError:
-            location = get_location_from_ip(ip_address)
-    else:
-        location = get_location_from_ip(ip_address)
+    # 2) Always fetch IP-based location and coords
+    ip_location_str, ip_coords = get_location_from_ip(ip_address)
 
-    # 3) Fetch previous login for travel anomaly (if you need it)
+    # 3) Determine current coords and location string
+    if simulate_wrong_location == "1" and latitude is not None and longitude is not None:
+        curr_coords = (latitude, longitude)
+        location = get_location_from_coordinates(latitude, longitude)
+    elif latitude is not None and longitude is not None:
+        curr_coords = (latitude, longitude)
+        location = get_location_from_coordinates(latitude, longitude)
+    else:
+        curr_coords = ip_coords
+        location = ip_location_str
+
+    # 4) Fetch previous login for travel anomaly
     last_login = await fetch_last_login(username)
 
-    # 4) Compute risk score
+    # 5) Compute risk score
     now = datetime.utcnow()
     risk_score = calculate_risk_score(
         ip=ip_address,
@@ -329,33 +322,24 @@ async def login(
     )
     is_susp = is_suspicious_login(risk_score)
 
-    # 5) Debug logging
-    print("---- Login Attempt ----")
-    print("Username:       ", username)
-    print("IP Address:     ", ip_address)
-    print("Location:       ", location)
-    print("User-Agent:     ", user_agent)
-    print("Risk Score:     ", risk_score)
-    print("Suspicious?:    ", is_susp)
-
-    # 6) Store everything (including username & coords)
+    # 6) Insert log
     await insert_log(
-        ip_address    = ip_address,
-        location      = location,
-        user_agent    = user_agent,
-        risk_score    = risk_score,
-        is_suspicious = is_susp,
-        username      = username,
-        latitude      = curr_coords[0] if curr_coords else None,
-        longitude     = curr_coords[1] if curr_coords else None
+        ip_address=ip_address,
+        location=location,
+        user_agent=user_agent,
+        risk_score=risk_score,
+        is_suspicious=is_susp,
+        username=username,
+        latitude=curr_coords[0],
+        longitude=curr_coords[1]
     )
 
-    # 7) Return the updated form with feedback
+    # 7) Return feedback
     return templates.TemplateResponse("login_xloc.html", {
-        "request":        request,
-        "message":        username,
-        "location":       location,
-        "risk_score":     risk_score,
-        "is_suspicious":  is_susp,
+        "request":       request,
+        "message":       username,
+        "location":      location,
+        "risk_score":    risk_score,
+        "is_suspicious": is_susp,
     })
 
