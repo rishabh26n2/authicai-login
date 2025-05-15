@@ -44,7 +44,9 @@ def calculate_risk_score(
       • Suspicious user agents:  +30
       • Time-of-day outlier:     +10 if outside user's typical login hours
       • Day-of-week outlier:     +10 if outside user's typical login days
-      • Burst/frequency spike:   +20 if recent_attempts >= 5
+      • Burst/frequency spike:
+          +10 if recent_attempts >= 3 in the window
+          +20 if recent_attempts >= 5 in the window
     """
     score = 0
 
@@ -107,9 +109,12 @@ def calculate_risk_score(
         if weekdays and now.weekday() not in set(weekdays):
             score += 10
 
-    # 7) Burst/frequency spike
-    if recent_attempts is not None and recent_attempts >= 5:
-        score += 20
+    # 7) Hybrid burst/frequency spike
+    if recent_attempts is not None:
+        if recent_attempts >= 5:
+            score += 20
+        elif recent_attempts >= 3:
+            score += 10
 
     return min(score, 100)
 
