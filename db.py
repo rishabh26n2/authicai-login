@@ -5,7 +5,6 @@ from databases import Database
 DATABASE_URL = os.getenv("DATABASE_URL")
 database = Database(DATABASE_URL)
 
-
 async def insert_log(
     ip_address: str,
     location: str,
@@ -58,21 +57,21 @@ async def insert_log(
         "is_suspicious": is_suspicious
     })
 
-
 async def fetch_last_login(username: str):
     """
     Fetch the most recent login record for this username,
-    returning timestamp, latitude, and longitude if present.
+    returning timestamp, latitude, longitude, and location.
     """
     query = """
     SELECT
       timestamp,
       latitude,
-      longitude
+      longitude,
+      location
     FROM request_logs
     WHERE username = :username
     ORDER BY timestamp DESC
     LIMIT 1
     """
     row = await database.fetch_one(query, values={"username": username})
-    return row   # will be a dict-like with keys 'timestamp','latitude','longitude'
+    return row   # will be a dict-like with keys 'timestamp','latitude','longitude','location'
