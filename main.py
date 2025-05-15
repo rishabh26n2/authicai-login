@@ -259,7 +259,13 @@ from fastapi.templating import Jinja2Templates
 
 from datetime import datetime
 
-from db import database, insert_log, fetch_last_login
+from db import (
+    database,
+    insert_log,
+    fetch_last_login,
+    fetch_login_history,
+    count_recent_attempts
+)
 from context_collector import get_location_from_ip, get_location_from_coordinates
 from risk_engine import calculate_risk_score, is_suspicious_login
 
@@ -294,10 +300,10 @@ async def login(
     # 2) Capture user-agent
     user_agent = request.headers.get("user-agent", "Unknown")
 
-    # 3) Always fetch IP-based location and coords
+    # 3) Fetch IP-based location and coords
     ip_location_str, ip_coords = get_location_from_ip(ip_address)
 
-    # 4) Determine current coords and location string
+    # 4) Determine current coords and location
     if latitude and longitude:
         lat, lon = float(latitude), float(longitude)
         curr_coords = (lat, lon)
@@ -306,10 +312,12 @@ async def login(
         curr_coords = ip_coords
         location = ip_location_str
 
-    # 5) Fetch previous login
+    # 5) Fetch last login and history for behavioral analysis
     last_login = await fetch_last_login(username)
+    login_history = await fetch_login_history(username, limit=20)
+    recent_attempts = await count_recent_attempts(username, seconds=30)
 
-    # 6) Compute risk score
+    # 6) Compute risk score with enriched rules
     now = datetime.utcnow()
     risk_score = calculate_risk_score(
         ip=ip_address,
@@ -317,7 +325,9 @@ async def login(
         user_agent=user_agent,
         last_login=last_login,
         curr_time=now,
-        curr_coords=curr_coords
+        curr_coords=curr_coords,
+        login_history=login_history,
+        recent_attempts=recent_attempts
     )
     is_susp = is_suspicious_login(risk_score)
 
@@ -335,9 +345,9 @@ async def login(
 
     # 8) Return feedback
     return templates.TemplateResponse("login_xloc.html", {
-        "request": request,
-        "message": username,
-        "location": location,
-        "risk_score": risk_score,
+        "request":       request,
+        "message":       username,
+        "location":      location,
+        "risk_score":    risk_score,
         "is_suspicious": is_susp,
     })
