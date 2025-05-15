@@ -315,7 +315,7 @@ async def login(
     # 5) Fetch last login and history for behavioral analysis
     last_login = await fetch_last_login(username)
     login_history = await fetch_login_history(username, limit=20)
-    recent_attempts = await count_recent_attempts(username, seconds=30)
+    recent_attempts = await count_recent_attempts(username, seconds=60)
 
     # 6) Compute risk score with enriched rules
     now = datetime.utcnow()
@@ -351,3 +351,4 @@ async def login(
         "risk_score":    risk_score,
         "is_suspicious": is_susp,
     })
+```
