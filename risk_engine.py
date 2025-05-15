@@ -16,6 +16,16 @@ def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return R * c
 
 
+def extract_country(loc_str: str) -> str:
+    """
+    Extract the country portion from a location string like 'City, Country'.
+    """
+    if not loc_str or "," not in loc_str:
+        return loc_str.strip()
+    parts = loc_str.split(",")
+    return parts[-1].strip()
+
+
 def calculate_risk_score(
     ip: str,
     location: str,
@@ -26,10 +36,10 @@ def calculate_risk_score(
 ) -> int:
     """
     Compute a heuristic risk score (0–100):
-      • Teleport anomaly:  +50 if implied speed > 500 km/h
-      • Unknown Location: +40
-      • Outside India:     +20
-      • Suspicious UA:     +30
+      • Teleport anomaly:        +50 if implied speed > 500 km/h
+      • Country change:          +20 if country differs from last login
+      • Unknown Location:        +40
+      • Suspicious user agents:  +30
     """
     score = 0
 
@@ -53,13 +63,16 @@ def calculate_risk_score(
             if speed > 500:
                 score += 50
 
-    # 2) Unknown / failed geolocation
+    # 2) Country change check
+    if last_login and last_login.get("location"):
+        last_country = extract_country(last_login["location"])
+        curr_country = extract_country(location)
+        if last_country and curr_country and last_country != curr_country:
+            score += 20
+
+    # 3) Unknown / failed geolocation
     if "Unknown" in location:
         score += 40
-
-    # 3) Outside India
-    if "India" not in location:
-        score += 20
 
     # 4) Suspicious user agents
     ua = user_agent.lower()
