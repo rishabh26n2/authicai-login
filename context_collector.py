@@ -1,20 +1,8 @@
 import requests
 
 GEOLOCATION_API_URL = "http://api.ipstack.com/"
-API_KEY = "cd656120f01ff045bff14d33bb81b432"  # (temporary fix)
+API_KEY = "cd656120f01ff045bff14d33bb81b432"
 
-# def get_location_from_ip(ip_address: str) -> str:
-#     try:
-#         response = requests.get(f"{GEOLOCATION_API_URL}{ip_address}?access_key={API_KEY}")
-#         response.raise_for_status()
-#         data = response.json()
-#         print("Geo API Response:", data)
-#         city = data.get("city")
-#         country = data.get("country_name")
-#         return f"{city}, {country}" if city and country else "Unknown Location"
-#     except requests.RequestException as e:
-#         print("Geo API Error:", str(e))
-#         return "Unknown Location"
 
 def get_location_from_ip(ip_address: str):
     """

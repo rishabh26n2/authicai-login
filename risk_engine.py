@@ -2,6 +2,7 @@ import math
 from datetime import datetime, timezone
 from typing import Optional, Any
 
+
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """
     Compute great-circle distance between two points (in kilometers).
