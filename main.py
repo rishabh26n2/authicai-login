@@ -291,12 +291,14 @@ async def login(
     xff = request.headers.get("x-forwarded-for")
     fallback = request.client.host
     ip_address = xff.split(",")[0].strip() if xff else fallback
+
+    # 2) Capture user-agent
     user_agent = request.headers.get("user-agent", "Unknown")
 
-    # 2) Always fetch IP-based location and coords
+    # 3) Always fetch IP-based location and coords
     ip_location_str, ip_coords = get_location_from_ip(ip_address)
 
-    # 3) Determine current coords and location string
+    # 4) Determine current coords and location string
     if simulate_wrong_location == "1" and latitude is not None and longitude is not None:
         curr_coords = (latitude, longitude)
         location = get_location_from_coordinates(latitude, longitude)
@@ -307,10 +309,10 @@ async def login(
         curr_coords = ip_coords
         location = ip_location_str
 
-    # 4) Fetch previous login for travel anomaly
+    # 5) Fetch previous login for travel anomaly
     last_login = await fetch_last_login(username)
 
-    # 5) Compute risk score
+    # 6) Compute risk score
     now = datetime.utcnow()
     risk_score = calculate_risk_score(
         ip=ip_address,
@@ -322,7 +324,7 @@ async def login(
     )
     is_susp = is_suspicious_login(risk_score)
 
-    # 6) Insert log
+    # 7) Insert log
     await insert_log(
         ip_address=ip_address,
         location=location,
@@ -334,7 +336,7 @@ async def login(
         longitude=curr_coords[1]
     )
 
-    # 7) Return feedback
+    # 8) Return feedback
     return templates.TemplateResponse("login_xloc.html", {
         "request":       request,
         "message":       username,
@@ -342,4 +344,3 @@ async def login(
         "risk_score":    risk_score,
         "is_suspicious": is_susp,
     })
-

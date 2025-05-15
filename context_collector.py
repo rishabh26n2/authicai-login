@@ -22,7 +22,7 @@ def get_location_from_ip(ip_address: str):
     """
     try:
         resp = requests.get(
-            f"{IPSTACK_URL}{ip_address}",
+            f"{GEOLOCATION_API_URL}{ip_address}",
             params={"access_key": API_KEY}
         )
         resp.raise_for_status()
@@ -60,6 +60,8 @@ def get_location_from_coordinates(lat: float, lon: float) -> str:
             or address.get("hamlet") or address.get("county") or address.get("state")
         )
         country = address.get("country")
-        return f"{city}, {country}" if city and country else "Unknown Location"
+        if city and country:
+            return f"{city}, {country}"
+        return "Unknown Location"
     except Exception:
         return "Unknown Location"
