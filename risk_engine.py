@@ -1,6 +1,6 @@
 import math
 from datetime import datetime, timezone
-from typing import Optional, Any
+from typing import Optional, Any, List
 
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -32,29 +32,35 @@ def calculate_risk_score(
     user_agent: str,
     last_login: Optional[Any] = None,
     curr_time: Optional[datetime] = None,
-    curr_coords: Optional[tuple] = None
+    curr_coords: Optional[tuple] = None,
+    login_history: Optional[List[datetime]] = None,
+    recent_attempts: Optional[int] = None
 ) -> int:
     """
-    Compute a heuristic risk score (0–100):
+    Compute a heuristic risk score (0–100) combining several rules:
       • Teleport anomaly:        +50 if implied speed > 500 km/h
       • Country change:          +20 if country differs from last login
       • Unknown Location:        +40
       • Suspicious user agents:  +30
+      • Time-of-day outlier:     +10 if outside user's typical login hours
+      • Day-of-week outlier:     +10 if outside user's typical login days
+      • Burst/frequency spike:   +20 if recent_attempts >= 5
     """
     score = 0
 
+    # Normalize current time to aware UTC
+    now = curr_time or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+
     # 1) Teleportation check
     if last_login and curr_coords:
-        now = curr_time or datetime.now(timezone.utc)
-        if now.tzinfo is None:
-            now = now.replace(tzinfo=timezone.utc)
         try:
             last_ts  = last_login["timestamp"]
             last_lat = last_login["latitude"]
             last_lon = last_login["longitude"]
         except Exception:
             last_ts = last_lat = last_lon = None
-
         if last_ts and last_lat is not None and last_lon is not None:
             if last_ts.tzinfo is None:
                 last_ts = last_ts.replace(tzinfo=timezone.utc)
@@ -65,7 +71,6 @@ def calculate_risk_score(
                 score += 50
 
     # 2) Country change check
-    # Safely extract last location string from record
     last_loc_str = None
     if last_login:
         try:
@@ -87,11 +92,30 @@ def calculate_risk_score(
     if any(tok in ua for tok in ("curl", "python", "wget")):
         score += 30
 
+    # 5) Time-of-day outlier
+    if login_history:
+        hours_hist = [dt.astimezone(timezone.utc).hour for dt in login_history]
+        if hours_hist:
+            min_h, max_h = min(hours_hist), max(hours_hist)
+            curr_h = now.hour
+            if curr_h < min_h or curr_h > max_h:
+                score += 10
+
+    # 6) Day-of-week outlier
+    if login_history:
+        weekdays = [dt.astimezone(timezone.utc).weekday() for dt in login_history]
+        if weekdays and now.weekday() not in set(weekdays):
+            score += 10
+
+    # 7) Burst/frequency spike
+    if recent_attempts is not None and recent_attempts >= 5:
+        score += 20
+
     return min(score, 100)
 
 
 def is_suspicious_login(score: int) -> bool:
     """
-    Flag logins with score >= 50 (any teleport anomaly or higher) as suspicious.
+    Flag logins with score >= 50 (any significant anomaly or higher) as suspicious.
     """
     return score >= 50

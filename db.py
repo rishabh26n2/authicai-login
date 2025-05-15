@@ -1,5 +1,7 @@
 import os
 from databases import Database
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional
 
 # Read the database URL from environment
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -74,4 +76,38 @@ async def fetch_last_login(username: str):
     LIMIT 1
     """
     row = await database.fetch_one(query, values={"username": username})
-    return row   # will be a dict-like with keys 'timestamp','latitude','longitude','location'
+    return row   # dict-like with keys 'timestamp','latitude','longitude','location'
+
+async def fetch_login_history(
+    username: str,
+    limit: int = 100
+) -> List[datetime]:
+    """
+    Retrieve the last `limit` login timestamps for a user.
+    """
+    query = """
+    SELECT timestamp
+    FROM request_logs
+    WHERE username = :username
+    ORDER BY timestamp DESC
+    LIMIT :limit
+    """
+    rows = await database.fetch_all(query, values={"username": username, "limit": limit})
+    return [row["timestamp"] for row in rows]
+
+async def count_recent_attempts(
+    username: str,
+    seconds: int = 30
+) -> int:
+    """
+    Count login attempts by `username` within the last `seconds` seconds.
+    """
+    threshold = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(seconds=seconds)
+    query = """
+    SELECT COUNT(*) AS count
+    FROM request_logs
+    WHERE username = :username
+      AND timestamp >= :threshold
+    """
+    row = await database.fetch_one(query, values={"username": username, "threshold": threshold})
+    return row["count"] if row and "count" in row else 0
