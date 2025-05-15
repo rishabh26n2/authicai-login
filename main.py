@@ -284,7 +284,6 @@ async def login(
     password: str = Form(...),
     latitude: str = Form(None),
     longitude: str = Form(None),
-    simulate_wrong_location: str = Form("0"),
     request: Request = None
 ):
     # 1) Determine client IP
@@ -298,27 +297,14 @@ async def login(
     # 3) Always fetch IP-based location and coords
     ip_location_str, ip_coords = get_location_from_ip(ip_address)
 
-    # 4) Parse incoming coords; fall back to IP coords
-    curr_coords = None
+    # 4) Determine current coords and location string
     if latitude and longitude:
-        try:
-            lat = float(latitude)
-            lon = float(longitude)
-            curr_coords = (lat, lon)
-        except ValueError:
-            curr_coords = ip_coords
-    else:
-        curr_coords = ip_coords
-
-    # Override if simulating wrong location
-    if simulate_wrong_location == "1" and latitude and longitude:
-        lat = float(latitude)
-        lon = float(longitude)
+        lat, lon = float(latitude), float(longitude)
         curr_coords = (lat, lon)
         location = get_location_from_coordinates(lat, lon)
     else:
-        lat_val, lon_val = curr_coords
-        location = get_location_from_coordinates(lat_val, lon_val) if latitude and longitude else ip_location_str
+        curr_coords = ip_coords
+        location = ip_location_str
 
     # 5) Fetch previous login
     last_login = await fetch_last_login(username)
