@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MFA Verification</title>
+</head>
+<body>
+    <h2>Multi-Factor Authentication</h2>
+    <form method="post" action="/mfa/verify">
+        <input type="hidden" name="username" value="{{ username }}">
+        <label for="code">Enter the 6-digit code sent to you:</label><br>
+        <input type="text" id="code" name="code" required><br><br>
+        <button type="submit">Verify</button>
+    </form>
+    {% if error %}
+        <p style="color:red;">{{ error }}</p>
+    {% endif %}
+</body>
+</html>

@@ -97,7 +97,6 @@
     </p>
   </header>
 
-
   <form id="login-form" action="/login" method="post">
     <input type="text" name="username"   placeholder="Username" required>
     <input type="password" name="password" placeholder="Password" required>
@@ -138,7 +137,6 @@
 
     locCheck.addEventListener("change", () => {
       if (locCheck.checked) {
-        // bogus coords (Statue of Liberty)
         document.getElementById("latitude").value  = 40.6892;
         document.getElementById("longitude").value = -74.0445;
         locFlag.value = "1";
@@ -167,6 +165,15 @@
       <p class="{{ 'suspicious-yes' if is_suspicious else 'suspicious-no' }}">
         Suspicious? {{ 'Yes' if is_suspicious else 'No' }}
       </p>
+      {% if risk_score < 30 %}
+        <p>Action Taken: Password Only</p>
+      {% elif risk_score < 60 %}
+        <p>Action Taken: OTP Verification</p>
+      {% elif risk_score < 80 %}
+        <p>Action Taken: Security Challenge</p>
+      {% else %}
+        <p>Action Taken: Login Blocked</p>
+      {% endif %}
     </div>
   {% endif %}
 </body>

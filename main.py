@@ -254,7 +254,7 @@
 #     })
 
 from fastapi import FastAPI, Request, Form
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from datetime import datetime
@@ -267,7 +267,8 @@ from db import (
     count_recent_attempts
 )
 from context_collector import get_location_from_ip, get_location_from_coordinates
-from risk_engine import calculate_risk_score, is_suspicious_login
+from risk_engine import calculate_risk_score
+from policy_engine import evaluate_policy
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -329,7 +330,8 @@ async def login(
         login_history=login_history,
         recent_attempts=recent_attempts
     )
-    is_susp = is_suspicious_login(risk_score)
+
+    policy_action = evaluate_policy(risk_score)
 
     # 7) Insert log
     await insert_log(
@@ -337,17 +339,30 @@ async def login(
         location=location,
         user_agent=user_agent,
         risk_score=risk_score,
-        is_suspicious=is_susp,
+        is_suspicious=(policy_action != "allow"),
         username=username,
         latitude=curr_coords[0],
         longitude=curr_coords[1]
     )
 
-    # 8) Return feedback
-    return templates.TemplateResponse("login_xloc.html", {
-        "request":       request,
-        "message":       username,
-        "location":      location,
-        "risk_score":    risk_score,
-        "is_suspicious": is_susp,
-    })
+    # 8) Policy-based action
+    if policy_action == "allow":
+        return templates.TemplateResponse("login_xloc.html", {
+            "request": request,
+            "message": username,
+            "location": location,
+            "risk_score": risk_score,
+            "is_suspicious": False,
+        })
+    elif policy_action == "otp":
+        return RedirectResponse(f"/mfa/start?username={username}", status_code=302)
+    elif policy_action == "challenge":
+        return RedirectResponse(f"/challenge-question?username={username}", status_code=302)
+    else:  # block
+        return templates.TemplateResponse("login_xloc.html", {
+            "request": request,
+            "message": "Blocked due to high risk.",
+            "location": location,
+            "risk_score": risk_score,
+            "is_suspicious": True,
+        })

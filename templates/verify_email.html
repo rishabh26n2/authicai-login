@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Email Verification</title>
+</head>
+<body>
+    <h2>Email Verification</h2>
+    <p>An email with a verification link has been sent to your address. Please click the link to continue.</p>
+
+    {% if token_validated %}
+        <p style="color:green;">Your email has been successfully verified. You may proceed.</p>
+    {% elif error %}
+        <p style="color:red;">{{ error }}</p>
+    {% endif %}
+</body>
+</html>

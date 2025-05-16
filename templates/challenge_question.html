@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Security Challenge</title>
+</head>
+<body>
+    <h2>Additional Security Challenge</h2>
+    <form method="post" action="/challenge-question/verify">
+        <input type="hidden" name="username" value="{{ username }}">
+        <label for="answer">What is the name of your first pet?</label><br>
+        <input type="text" id="answer" name="answer" required><br><br>
+        <button type="submit">Submit</button>
+    </form>
+    {% if error %}
+        <p style="color:red;">{{ error }}</p>
+    {% endif %}
+</body>
+</html>
