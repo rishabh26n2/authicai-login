@@ -269,8 +269,13 @@ from db import (
 from context_collector import get_location_from_ip, get_location_from_coordinates
 from risk_engine import calculate_risk_score
 from policy_engine import evaluate_policy
+from routers import mfa
+from routers import challenge
 
 app = FastAPI()
+
+app.include_router(challenge.router)
+app.include_router(mfa.router)
 templates = Jinja2Templates(directory="templates")
 
 @app.on_event("startup")
