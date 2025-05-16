@@ -298,18 +298,13 @@ async def login(
     longitude: str = Form(None),
     request: Request = None
 ):
-    # 1) Determine client IP
     xff = request.headers.get("x-forwarded-for")
     fallback = request.client.host
     ip_address = xff.split(",")[0].strip() if xff else fallback
 
-    # 2) Capture user-agent
     user_agent = request.headers.get("user-agent", "Unknown")
-
-    # 3) Fetch IP-based location and coords
     ip_location_str, ip_coords = get_location_from_ip(ip_address)
 
-    # 4) Determine current coords and location
     if latitude and longitude:
         lat, lon = float(latitude), float(longitude)
         curr_coords = (lat, lon)
@@ -318,12 +313,10 @@ async def login(
         curr_coords = ip_coords
         location = ip_location_str
 
-    # 5) Fetch last login and history for behavioral analysis
     last_login = await fetch_last_login(username)
     login_history = await fetch_login_history(username, limit=20)
     recent_attempts = await count_recent_attempts(username, seconds=60)
 
-    # 6) Compute risk score with enriched rules
     now = datetime.utcnow()
     risk_score = calculate_risk_score(
         ip=ip_address,
@@ -338,7 +331,6 @@ async def login(
 
     policy_action = evaluate_policy(risk_score)
 
-    # 7) Insert log
     await insert_log(
         ip_address=ip_address,
         location=location,
@@ -350,7 +342,6 @@ async def login(
         longitude=curr_coords[1]
     )
 
-    # 8) Policy-based action
     if policy_action == "allow":
         return templates.TemplateResponse("login_xloc.html", {
             "request": request,
@@ -359,10 +350,12 @@ async def login(
             "risk_score": risk_score,
             "is_suspicious": False,
         })
-    elif policy_action == "otp":
-        return RedirectResponse(f"/mfa/start?username={username}", status_code=302)
     elif policy_action == "challenge":
         return RedirectResponse(f"/challenge-question?username={username}", status_code=302)
+    elif policy_action == "otp":
+        return RedirectResponse(f"/mfa/start?username={username}", status_code=302)
+    elif policy_action == "otp_email":
+        return RedirectResponse(f"/verify-email?username={username}", status_code=302)
     else:  # block
         return templates.TemplateResponse("login_xloc.html", {
             "request": request,
@@ -371,3 +364,4 @@ async def login(
             "risk_score": risk_score,
             "is_suspicious": True,
         })
+

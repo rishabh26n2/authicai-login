@@ -1,18 +1,19 @@
 def evaluate_policy(score: int) -> str:
     """
-    Map a numeric risk score to an authentication policy action.
-
     Returns one of:
-      - "allow": login proceeds normally
-      - "otp": require one-time passcode (MFA)
-      - "challenge": require additional challenge (e.g. security question)
-      - "block": deny login or escalate to admin
+    - 'allow'
+    - 'challenge' (security question)
+    - 'otp'
+    - 'otp_email'
+    - 'block'
     """
-    if score < 30:
+    if score < 20:
         return "allow"
-    elif score < 60:
-        return "otp"
-    elif score < 80:
+    elif score < 40:
         return "challenge"
+    elif score < 70:
+        return "otp"
+    elif score < 85:
+        return "otp_email"
     else:
         return "block"
