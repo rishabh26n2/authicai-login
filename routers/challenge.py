@@ -6,10 +6,8 @@ router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
 # Hardcoded challenge answers (for demo only)
-user_challenges = {
-    "Rohit": "tiger",
-    "Rony": "sparky"
-}
+EXPECTED_ANSWER = "shadow"  # or anything you like
+
 
 @router.get("/challenge-question", response_class=HTMLResponse)
 async def challenge_question(request: Request, username: str = Query(...)):
@@ -20,8 +18,7 @@ async def challenge_question(request: Request, username: str = Query(...)):
 
 @router.post("/challenge-question/verify", response_class=HTMLResponse)
 async def verify_challenge(request: Request, username: str = Form(...), answer: str = Form(...)):
-    expected = user_challenges.get(username, "")
-    if answer.strip().lower() == expected.lower():
+    if answer.strip().lower() == EXPECTED_ANSWER.lower():
         return templates.TemplateResponse("login_xloc.html", {
             "request": request,
             "message": f"{username} authenticated after challenge",
@@ -34,3 +31,4 @@ async def verify_challenge(request: Request, username: str = Form(...), answer: 
         "username": username,
         "error": "Incorrect answer. Please try again."
     })
+
