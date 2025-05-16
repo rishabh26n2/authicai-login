@@ -23,7 +23,7 @@ async def verify_challenge(request: Request, username: str = Form(...), answer: 
             "request": request,
             "message": f"{username} authenticated after challenge",
             "location": "verified",
-            "risk_score": 100,
+            "risk_score": 10,
             "is_suspicious": False,
         })
     return templates.TemplateResponse("challenge_question.html", {
