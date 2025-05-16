@@ -14,7 +14,11 @@ async def start_mfa(request: Request, username: str = Query(...)):
     code = str(random.randint(100000, 999999))
     mfa_store[username] = code
     print(f"[MFA] Verification code for {username}: {code}")  # Simulate SMS/email delivery
-    return templates.TemplateResponse("mfa_verify.html", {"request": request, "username": username})
+    return templates.TemplateResponse("mfa_verify.html", {
+        "request": request,
+        "username": username,
+        "otp": code
+    })
 
 @router.post("/mfa/verify", response_class=HTMLResponse)
 async def verify_mfa(request: Request, username: str = Form(...), code: str = Form(...)):
