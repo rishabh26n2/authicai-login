@@ -271,11 +271,14 @@ from risk_engine import calculate_risk_score
 from policy_engine import evaluate_policy
 from routers import mfa
 from routers import challenge
+from routers import verify_email
 
 app = FastAPI()
 
-app.include_router(challenge.router)
 app.include_router(mfa.router)
+app.include_router(challenge.router)
+app.include_router(verify_email.router)
+
 templates = Jinja2Templates(directory="templates")
 
 @app.on_event("startup")
