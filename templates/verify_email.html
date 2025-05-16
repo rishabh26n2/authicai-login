@@ -9,6 +9,11 @@
 
     {% if token_validated %}
         <p style="color:green;">Your email has been successfully verified. You may proceed.</p>
+        <script>
+          setTimeout(() => {
+            window.location.href = "/";
+          }, 3000); // redirect after 3 seconds
+        </script>
     {% elif error %}
         <p style="color:red;">{{ error }}</p>
     {% endif %}
