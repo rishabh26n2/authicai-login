@@ -97,23 +97,30 @@
     </p>
   </header>
 
-  <form id="login-form" action="/login" method="post">
-    <input type="text" name="username"   placeholder="Username" required>
-    <input type="password" name="password" placeholder="Password" required>
+<form id="login-form" action="/login" method="post">
+  <input type="text" name="username" placeholder="Username" required>
+  <input type="password" name="password" placeholder="Password" required>
 
-    <!-- Hidden geolocation fields -->
-    <input type="hidden" name="latitude"  id="latitude"  value="">
-    <input type="hidden" name="longitude" id="longitude" value="">
+  <!-- Hidden geolocation fields -->
+  <input type="hidden" name="latitude"  id="latitude"  value="">
+  <input type="hidden" name="longitude" id="longitude" value="">
 
-    <!-- Simulate wrong location for testing -->
-    <div class="checkbox-group">
-      <input type="checkbox" id="locCheck">
-      <label for="locCheck">Simulate Wrong Location</label>
-    </div>
-    <input type="hidden" name="simulate_wrong_location" id="simulate_wrong_location" value="0">
+  <!-- Simulate wrong location for testing -->
+  <div class="checkbox-group">
+    <input type="checkbox" id="locCheck">
+    <label for="locCheck">Simulate Wrong Location</label>
+  </div>
+  <input type="hidden" name="simulate_wrong_location" id="simulate_wrong_location" value="0">
 
-    <button type="submit" id="submit-btn" disabled>Login</button>
-  </form>
+  <!-- ✅ New ML toggle -->
+  <div class="checkbox-group">
+    <input type="checkbox" id="mlCheck" name="use_ml" value="true" checked>
+    <label for="mlCheck">Use ML-based Risk Scoring</label>
+  </div>
+
+  <button type="submit" id="submit-btn" disabled>Login</button>
+</form>
+
 
   <script>
     const btn      = document.getElementById("submit-btn");

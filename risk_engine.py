@@ -115,9 +115,10 @@ def calculate_risk_score(
     curr_time: Optional[datetime] = None,
     curr_coords: Optional[tuple] = None,
     login_history: Optional[List[datetime]] = None,
-    recent_attempts: Optional[int] = None
+    recent_attempts: Optional[int] = None,
+    use_ml: bool = True  # ✅ NEW
 ) -> int:
-    if USE_ML_MODEL and model and curr_coords:
+    if use_ml and model and curr_coords:
         try:
             features = {
                 "hour": curr_time.hour,
