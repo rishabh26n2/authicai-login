@@ -287,7 +287,10 @@ async def shutdown():
 
 @app.get("/", response_class=HTMLResponse)
 async def login_form(request: Request):
-    return templates.TemplateResponse("login_xloc.html", {"request": request})
+    return templates.TemplateResponse("login_xloc.html", {
+        "request": request,
+        "use_ml": True  # default to ML enabled
+    })
 
 @app.post("/login", response_class=HTMLResponse)
 async def login(
