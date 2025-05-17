@@ -306,7 +306,7 @@ async def login(
     # 2) Capture user-agent
     user_agent = request.headers.get("user-agent", "Unknown")
 
-    # 3) Get IP-based and/or browser-provided coordinates
+    # 3) Get location from coordinates or IP
     ip_location_str, ip_coords = get_location_from_ip(ip_address)
     if latitude and longitude:
         lat, lon = float(latitude), float(longitude)
@@ -316,12 +316,12 @@ async def login(
         curr_coords = ip_coords
         location = ip_location_str
 
-    # 4) Get login history
+    # 4) Get historical login context
     last_login = await fetch_last_login(username)
     login_history = await fetch_login_history(username, limit=20)
     recent_attempts = await count_recent_attempts(username, seconds=60)
 
-    # 5) Risk scoring
+    # 5) Risk score calculation
     now = datetime.utcnow()
     risk_score = calculate_risk_score(
         ip=ip_address,
@@ -332,13 +332,13 @@ async def login(
         curr_coords=curr_coords,
         login_history=login_history,
         recent_attempts=recent_attempts,
-        use_ml=(use_ml == "true")  # ✅ Form toggle interpreted
+        use_ml=(use_ml == "true")
     )
 
-    # 6) Determine policy action
+    # 6) Policy evaluation
     policy_action = evaluate_policy(risk_score)
 
-    # 7) Store log
+    # 7) Log the login attempt
     await insert_log(
         ip_address=ip_address,
         location=location,
@@ -350,7 +350,7 @@ async def login(
         longitude=curr_coords[1]
     )
 
-    # 8) Respond based on policy
+    # 8) Take action based on policy
     if policy_action == "allow":
         return templates.TemplateResponse("login_xloc.html", {
             "request": request,
@@ -358,6 +358,7 @@ async def login(
             "location": location,
             "risk_score": risk_score,
             "is_suspicious": False,
+            "use_ml": (use_ml == "true")
         })
     elif policy_action == "challenge":
         return RedirectResponse(f"/challenge-question?username={username}", status_code=302)
@@ -365,11 +366,13 @@ async def login(
         return RedirectResponse(f"/mfa/start?username={username}", status_code=302)
     elif policy_action == "otp_email":
         return RedirectResponse(f"/verify-email?username={username}", status_code=302)
-    else:
+    else:  # block
         return templates.TemplateResponse("login_xloc.html", {
             "request": request,
             "message": "Blocked due to high risk.",
             "location": location,
             "risk_score": risk_score,
             "is_suspicious": True,
+            "use_ml": (use_ml == "true")
         })
+
