@@ -5,3 +5,4 @@ requests
 databases
 asyncpg
 python-multipart
+joblib
