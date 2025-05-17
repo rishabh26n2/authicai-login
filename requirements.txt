@@ -7,3 +7,4 @@ asyncpg
 python-multipart
 joblib
 pandas
+scikit-learn
