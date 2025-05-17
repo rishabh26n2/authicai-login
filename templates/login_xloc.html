@@ -114,6 +114,8 @@
 
   <!-- ✅ New ML toggle -->
   <div class="checkbox-group">
+    <!-- fallback to ensure unchecked state is submitted -->
+    <input type="hidden" name="use_ml" value="false">
     <input type="checkbox" id="mlCheck" name="use_ml" value="true" {% if use_ml %}checked{% endif %}>
     <label for="mlCheck">Use ML-based Risk Scoring</label>
   </div>
