@@ -7,7 +7,7 @@ GEOLOCATION_API_URL = "http://api.ipstack.com/"
 def get_location_from_ip(ip_address: str):
     """
     Returns a tuple: (location_str, (latitude, longitude)).
-    Tries IPStack → falls back to ipapi.co → logs reason clearly.
+    Tries IPStack → falls back to ipwho.is → logs reason clearly.
     """
     # --- Try IPStack first
     try:
@@ -30,29 +30,28 @@ def get_location_from_ip(ip_address: str):
         return loc_str, (lat, lon)
 
     except Exception as e:
-        print("⚠️ IPStack failed, falling back to ipapi.co:", e)
+        print("⚠️ IPStack failed, falling back to ipwho.is:", e)
 
-    # --- Try ipapi.co with 1 retry if rate-limited
+    # --- Fallback to ipwho.is
     try:
-        for attempt in range(2):
-            r2 = requests.get(f"https://ipapi.co/{ip_address}/json/")
-            if r2.status_code == 429:
-                print("⚠️ ipapi.co rate-limited (429) — retrying after 1s")
-                time.sleep(1)
-                continue
-            r2.raise_for_status()
-            data = r2.json()
+        r2 = requests.get(f"https://ipwho.is/{ip_address}")
+        r2.raise_for_status()
+        data = r2.json()
 
-            city = data.get("city")
-            country = data.get("country_name")
-            lat = data.get("latitude")
-            lon = data.get("longitude")
-            loc_str = f"{city}, {country}" if city and country else country or city or "Unknown Location"
-            print("✅ Location resolved via ipapi.co")
-            return loc_str, (lat, lon)
+        if not data.get("success"):
+            print("⚠️ ipwho.is error:", data.get("message"))
+            raise ValueError("ipwho.is failed")
+
+        city = data.get("city")
+        country = data.get("country")
+        lat = data.get("latitude")
+        lon = data.get("longitude")
+        loc_str = f"{city}, {country}" if city and country else country or city or "Unknown Location"
+        print("✅ Location resolved via ipwho.is")
+        return loc_str, (lat, lon)
 
     except Exception as e2:
-        print("❌ Both IPStack and ipapi.co failed:", e2)
+        print("❌ Both IPStack and ipwho.is failed:", e2)
 
     return "Unknown Location", (None, None)
 
