@@ -17,7 +17,8 @@ async def verify_email(request: Request, username: str = Query(...)):
         is_suspicious=False,
         username=username,
         latitude=None,
-        longitude=None
+        longitude=None,
+        note="Email verification passed"   # ✅ Note added
     )
     return templates.TemplateResponse("verify_email.html", {
         "request": request,

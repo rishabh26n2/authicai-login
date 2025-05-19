@@ -19,7 +19,7 @@ async def start_mfa(request: Request, username: str = Query(...)):
     return templates.TemplateResponse("mfa_verify.html", {
         "request": request,
         "username": username,
-        "otp": code  # ✅ this brings it back to the page
+        "otp": code  # ✅ makes OTP visible on the form
     })
 
 @router.post("/mfa/verify", response_class=HTMLResponse)
@@ -27,7 +27,7 @@ async def verify_mfa(request: Request, username: str = Form(...), code: str = Fo
     expected = mfa_store.get(username)
     if expected and code == expected:
         del mfa_store[username]
-        # ✅ Log success
+        # ✅ Log success with note
         await insert_log(
             ip_address="verified",
             location="verified",
@@ -36,7 +36,8 @@ async def verify_mfa(request: Request, username: str = Form(...), code: str = Fo
             is_suspicious=False,
             username=username,
             latitude=None,
-            longitude=None
+            longitude=None,
+            note="MFA passed"  # ✅ Added note
         )
         return templates.TemplateResponse("login_xloc.html", {
             "request": request,

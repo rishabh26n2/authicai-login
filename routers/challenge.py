@@ -27,7 +27,8 @@ async def verify_answer(request: Request, username: str = Form(...), answer: str
             is_suspicious=False,
             username=username,
             latitude=None,
-            longitude=None
+            longitude=None,
+            note="Security question passed"  # ✅ Added note
         )
         return templates.TemplateResponse("login_xloc.html", {
             "request": request,
