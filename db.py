@@ -15,7 +15,8 @@ async def insert_log(
     is_suspicious: bool = False,
     username: str = None,
     latitude: float = None,
-    longitude: float = None
+    longitude: float = None,
+    note: Optional[str] = None  # ✅ new field
 ):
     """
     Insert a login attempt into request_logs, recording:
@@ -26,6 +27,7 @@ async def insert_log(
       - latitude / longitude (if available)
       - numeric risk_score (0–100)
       - boolean is_suspicious flag
+      - optional note (e.g. "MFA passed")
     """
     query = """
     INSERT INTO request_logs (
@@ -36,7 +38,8 @@ async def insert_log(
       latitude,
       longitude,
       risk_score,
-      is_suspicious
+      is_suspicious,
+      note
     ) VALUES (
       :ip_address,
       :location,
@@ -45,7 +48,8 @@ async def insert_log(
       :latitude,
       :longitude,
       :risk_score,
-      :is_suspicious
+      :is_suspicious,
+      :note
     )
     """
     await database.execute(query, values={
@@ -56,7 +60,8 @@ async def insert_log(
         "latitude":      latitude,
         "longitude":     longitude,
         "risk_score":    risk_score,
-        "is_suspicious": is_suspicious
+        "is_suspicious": is_suspicious,
+        "note":          note  # ✅ pass optional note
     })
 
 async def fetch_last_login(username: str):
