@@ -20,6 +20,9 @@ except Exception as e:
 explainer = None
 if model:
     try:
+        preprocessor = model.named_steps['pre']
+        classifier = model.named_steps['clf']
+
         sample_raw = pd.DataFrame([{
             "hour": 12,
             "weekday": 1,
@@ -30,7 +33,10 @@ if model:
             "ip_1": 1.0,
             "ip_2": 1.0
         }])
-        explainer = shap.Explainer(model, sample_raw)
+
+        sample_transformed = preprocessor.transform(sample_raw)
+        explainer = shap.Explainer(classifier, sample_transformed)
+
     except Exception as e:
         print("⚠️ SHAP explainer init failed:", e)
         explainer = None
@@ -56,7 +62,8 @@ def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
         reasons = []
 
         if explainer:
-            shap_values = explainer(df)
+            transformed = model.named_steps['pre'].transform(df)
+            shap_values = explainer(transformed)
             values = shap_values.values[0]
             feature_names = df.columns
             top_contributors = sorted(
