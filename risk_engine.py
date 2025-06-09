@@ -20,9 +20,6 @@ except Exception as e:
 explainer = None
 if model:
     try:
-        preprocessor = model.named_steps['pre']
-        classifier = model.named_steps['clf']
-
         sample_raw = pd.DataFrame([{
             "hour": 12,
             "weekday": 1,
@@ -33,10 +30,8 @@ if model:
             "ip_1": 1.0,
             "ip_2": 1.0
         }])
-
-        sample_transformed = preprocessor.transform(sample_raw)
-        explainer = shap.Explainer(classifier, sample_transformed)
-
+        # Use permutation-based explainer for pipelines
+        explainer = shap.Explainer(model.predict_proba, sample_raw, algorithm="permutation")
     except Exception as e:
         print("⚠️ SHAP explainer init failed:", e)
         explainer = None
