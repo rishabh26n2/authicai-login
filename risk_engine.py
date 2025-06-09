@@ -20,11 +20,28 @@ except Exception as e:
 explainer = None
 if model:
     try:
-        sample_df = pd.DataFrame([{
-            "hour": 12, "weekday": 1, "latitude": 0.0, "longitude": 0.0,
-            "user_agent": "browser", "country": "India", "ip_1": 1.0, "ip_2": 1.0
+        # Extract the preprocessor and classifier from the pipeline
+        preprocessor = model.named_steps['pre']
+        classifier = model.named_steps['clf']
+
+        # Build sample input
+        sample_raw = pd.DataFrame([{
+            "hour": 12,
+            "weekday": 1,
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "user_agent": "browser",
+            "country": "India",
+            "ip_1": 1.0,
+            "ip_2": 1.0
         }])
-        explainer = shap.Explainer(model.predict_proba, sample_df)
+
+        # Transform with preprocessor
+        sample_transformed = preprocessor.transform(sample_raw)
+
+        # Initialize TreeExplainer with just the classifier and transformed input
+        explainer = shap.Explainer(classifier, sample_transformed)
+
     except Exception as e:
         print("⚠️ SHAP explainer init failed:", e)
         explainer = None
