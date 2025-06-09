@@ -208,7 +208,6 @@ def calculate_risk_score(
     return_reasons: bool = False
 ) -> Union[int, Tuple[int, List[str], str]]:
     if use_ml and model:
-        # ✅ Handle missing coordinates
         if not curr_coords:
             curr_coords = (0.0, 0.0)
             print("⚠️ No coordinates provided. Using fallback (0.0, 0.0) for ML.")
@@ -230,7 +229,6 @@ def calculate_risk_score(
         except Exception as e:
             print("⚠️ ML failed, falling back to rules:", e)
 
-    # Fallback or rule-based scoring
     score, reasons = calculate_risk_score_rules(
         ip, location, user_agent, last_login, curr_time, curr_coords, login_history, recent_attempts
     )
@@ -241,3 +239,4 @@ def calculate_risk_score(
 # =======================
 def is_suspicious_login(score: int) -> bool:
     return score >= 50
+    
