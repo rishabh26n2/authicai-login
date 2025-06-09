@@ -252,6 +252,9 @@
 #         "message": f"Welcome {username}!",
 #         "location": location
 #     })
+
+
+
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -311,13 +314,20 @@ async def login(
 
     # 3) Get location from coordinates or IP
     ip_location_str, ip_coords = get_location_from_ip(ip_address)
+    location = ip_location_str
+    curr_coords = ip_coords
+
     if latitude and longitude:
         lat, lon = float(latitude), float(longitude)
+        coord_based_location = get_location_from_coordinates(lat, lon)
+
+        # ✅ Fallback to IP-based location if reverse geocoding fails
+        if coord_based_location != "Unknown Location":
+            location = coord_based_location
+        else:
+            print("⚠️ Reverse geocoding failed. Falling back to IP-based location.")
+        
         curr_coords = (lat, lon)
-        location = get_location_from_coordinates(lat, lon)
-    else:
-        curr_coords = ip_coords
-        location = ip_location_str
 
     # 4) Get historical login context
     last_login = await fetch_last_login(username)
@@ -372,28 +382,20 @@ async def login(
             "use_ml": use_ml_bool,
             "reasons": reasons
         })
-    elif policy_action == "challenge":
+    else:
         query = urlencode({
             "username": username,
             "risk_score": risk_score,
             "reasons": "|".join(reasons)
         })
-        return RedirectResponse(f"/challenge-question?{query}", status_code=302)
-    elif policy_action == "otp":
-        query = urlencode({
-            "username": username,
-            "risk_score": risk_score,
-            "reasons": "|".join(reasons)
-        })
-        return RedirectResponse(f"/mfa/start?{query}", status_code=302)
-    elif policy_action == "otp_email":
-        query = urlencode({
-            "username": username,
-            "risk_score": risk_score,
-            "reasons": "|".join(reasons)
-        })
-        return RedirectResponse(f"/verify-email?{query}", status_code=302)
-    else:  # block
+        if policy_action == "challenge":
+            return RedirectResponse(f"/challenge-question?{query}", status_code=302)
+        elif policy_action == "otp":
+            return RedirectResponse(f"/mfa/start?{query}", status_code=302)
+        elif policy_action == "otp_email":
+            return RedirectResponse(f"/verify-email?{query}", status_code=302)
+
+        # block
         return templates.TemplateResponse("login_xloc.html", {
             "request": request,
             "message": "Blocked due to high risk.",
