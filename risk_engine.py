@@ -4,7 +4,9 @@ from typing import Optional, Any, List, Tuple
 import joblib
 import os
 import pandas as pd
+import shap  # ✅ SHAP for explainability
 
+# Toggle: switch to ML or fallback to rules
 USE_ML_MODEL = True
 MODEL_PATH = "models/risk_model_v2.pkl"
 
@@ -14,6 +16,14 @@ except Exception as e:
     print("⚠️ Failed to load ML model:", e)
     model = None
     USE_ML_MODEL = False
+
+explainer = None
+if model:
+    try:
+        explainer = shap.Explainer(model)
+    except Exception as e:
+        print("⚠️ SHAP explainer init failed:", e)
+        explainer = None
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     R = 6371.0
@@ -33,7 +43,22 @@ def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
     try:
         df = pd.DataFrame([features])
         score = model.predict_proba(df)[0][1] * 100
-        return int(score), []  # ML doesn't provide reasons here
+        reasons = []
+
+        if explainer:
+            shap_values = explainer(df)
+            values = shap_values.values[0]
+            feature_names = df.columns
+            top_contributors = sorted(
+                zip(feature_names, values), key=lambda x: abs(x[1]), reverse=True
+            )[:3]
+            for feat, val in top_contributors:
+                reasons.append(f"{feat} contributed ({val:+.2f})")
+        else:
+            reasons = ["SHAP not available"]
+
+        return int(score), reasons
+
     except Exception as e:
         print("⚠️ ML model prediction failed:", e)
         return 0, ["ML model failed, fallback to rule-based"]
