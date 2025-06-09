@@ -28,7 +28,7 @@ async def verify_answer(request: Request, username: str = Form(...), answer: str
             username=username,
             latitude=None,
             longitude=None,
-            note="Security question passed"  # ✅ Added note
+            note="Security question passed"
         )
         return templates.TemplateResponse("login_xloc.html", {
             "request": request,
@@ -36,7 +36,8 @@ async def verify_answer(request: Request, username: str = Form(...), answer: str
             "location": "verified",
             "risk_score": 10,
             "is_suspicious": False,
-            "use_ml": True
+            "use_ml": True,
+            "reasons": ["Scoring: N/A (challenge passed)"]  # ✅ avoids Jinja crash
         })
     return templates.TemplateResponse("challenge_question.html", {
         "request": request,

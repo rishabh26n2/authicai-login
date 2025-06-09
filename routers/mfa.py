@@ -45,7 +45,8 @@ async def verify_mfa(request: Request, username: str = Form(...), code: str = Fo
             "location": "verified",
             "risk_score": 10,
             "is_suspicious": False,
-            "use_ml": True
+            "use_ml": True,
+            "reasons": ["Scoring: N/A (post-verification)"]
         })
     return templates.TemplateResponse("mfa_verify.html", {
         "request": request,
