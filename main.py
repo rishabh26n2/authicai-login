@@ -330,7 +330,7 @@ async def login(
         curr_coords = (lat, lon)
 
     # 4) Get historical login context
-    last_login = await fetch_last_login(username)
+    last_login = dict(last_login) if last_login else None
     login_history = await fetch_login_history(username, limit=20)
     recent_attempts = await count_recent_attempts(username, seconds=60)
 
