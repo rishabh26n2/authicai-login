@@ -175,10 +175,11 @@
       Suspicious? {{ 'Yes' if is_suspicious else 'No' }}
     </p>
     
-    {% if reasons %}
+    <p><strong>Scoring Method:</strong> {{ reasons[0] }}</p>
+    {% if reasons|length > 1 %}
       <p><strong>Reasons for Risk Score:</strong></p>
       <ul>
-        {% for reason in reasons %}
+        {% for reason in reasons[1:] %}
           <li>{{ reason }}</li>
         {% endfor %}
       </ul>
