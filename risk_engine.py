@@ -16,8 +16,14 @@ except Exception as e:
     USE_ML_MODEL = False
 
 explainer = None
+preprocessor = None
+classifier = None
+
 if model:
     try:
+        preprocessor = model.named_steps['pre']
+        classifier = model.named_steps['clf']
+
         sample_raw = pd.DataFrame([{
             "hour": 12,
             "weekday": 1,
@@ -28,8 +34,11 @@ if model:
             "ip_1": 1.0,
             "ip_2": 1.0
         }])
-        explainer = shap.Explainer(model.predict, sample_raw)
+
+        sample_transformed = preprocessor.transform(sample_raw)
+        explainer = shap.TreeExplainer(classifier, data=sample_transformed, feature_perturbation="auto")
         print("\u2705 SHAP explainer initialized")
+
     except Exception as e:
         print("\u26a0\ufe0f SHAP explainer init failed:", e)
         explainer = None
@@ -51,13 +60,18 @@ def extract_country(loc_str: str) -> str:
 def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
     try:
         df = pd.DataFrame([features])
-        score = model.predict_proba(df)[0][1] * 100
+        print("🧪 DF content:", df.to_dict(orient='records'))
+        print("🧪 DF types before prediction:", df.dtypes.to_dict())
+
+        # Apply preprocessing manually
+        transformed = preprocessor.transform(df)
+        score = classifier.predict_proba(transformed)[0][1] * 100
         reasons = []
 
         if explainer:
-            shap_values = explainer(df)
-            values = shap_values.values[0]
-            feature_names = shap_values.feature_names
+            shap_values = explainer.shap_values(transformed)
+            values = shap_values[1][0] if isinstance(shap_values, list) else shap_values.values[0]
+            feature_names = explainer.data.feature_names if hasattr(explainer.data, 'feature_names') else [f"f{i}" for i in range(len(values))]
             top_contributors = sorted(
                 zip(feature_names, values), key=lambda x: abs(x[1]), reverse=True
             )[:3]
@@ -158,10 +172,10 @@ def calculate_risk_score(
             features = {
                 "hour": curr_time.hour,
                 "weekday": curr_time.weekday(),
-                "latitude": curr_coords[0],
-                "longitude": curr_coords[1],
-                "user_agent": user_agent,
-                "country": extract_country(location),
+                "latitude": float(curr_coords[0]),
+                "longitude": float(curr_coords[1]),
+                "user_agent": str(user_agent),
+                "country": str(extract_country(location)),
                 "ip_1": float(ip.split(".")[0]),
                 "ip_2": float(ip.split(".")[1]),
             }
