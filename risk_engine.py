@@ -1,6 +1,6 @@
 import math
 from datetime import datetime, timezone
-from typing import Optional, Any, List, Tuple
+from typing import Optional, Any, List, Tuple, Union
 import joblib
 import pandas as pd
 import shap
@@ -197,7 +197,7 @@ def calculate_risk_score(
     recent_attempts: Optional[int] = None,
     use_ml: bool = True,
     return_reasons: bool = False
-) -> Any:
+) -> Union[int, Tuple[int, List[str], str]]:
     if use_ml and model and curr_coords:
         try:
             features = {
@@ -211,7 +211,7 @@ def calculate_risk_score(
                 "ip_2": float(ip.split(".")[1]),
             }
             score, reasons = calculate_risk_score_ml(features)
-            return (score, reasons) if return_reasons else score
+            return (score, reasons, "ML") if return_reasons else score
         except Exception as e:
             print("⚠️ ML failed, falling back to rules:", e)
 
@@ -219,7 +219,7 @@ def calculate_risk_score(
     score, reasons = calculate_risk_score_rules(
         ip, location, user_agent, last_login, curr_time, curr_coords, login_history, recent_attempts
     )
-    return (score, reasons) if return_reasons else score
+    return (score, reasons, "Rule-Based") if return_reasons else score
 
 # =======================
 # Flag suspicious score
