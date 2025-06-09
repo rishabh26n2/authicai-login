@@ -125,7 +125,11 @@ def calculate_risk_score(
     use_ml: bool = True,
     return_reasons: bool = False
 ) -> Any:
-    if use_ml and model and curr_coords:
+    if use_ml and model:
+        if not curr_coords:
+            curr_coords = (0.0, 0.0)
+            print("⚠️ curr_coords missing — using fallback (0.0, 0.0) for ML scoring")
+
         try:
             features = {
                 "hour": curr_time.hour,
