@@ -252,11 +252,11 @@
 #         "message": f"Welcome {username}!",
 #         "location": location
 #     })
-
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from datetime import datetime
+from urllib.parse import urlencode
 
 from db import (
     database,
@@ -373,11 +373,26 @@ async def login(
             "reasons": reasons
         })
     elif policy_action == "challenge":
-        return RedirectResponse(f"/challenge-question?username={username}", status_code=302)
+        query = urlencode({
+            "username": username,
+            "risk_score": risk_score,
+            "reasons": "|".join(reasons)
+        })
+        return RedirectResponse(f"/challenge-question?{query}", status_code=302)
     elif policy_action == "otp":
-        return RedirectResponse(f"/mfa/start?username={username}", status_code=302)
+        query = urlencode({
+            "username": username,
+            "risk_score": risk_score,
+            "reasons": "|".join(reasons)
+        })
+        return RedirectResponse(f"/mfa/start?{query}", status_code=302)
     elif policy_action == "otp_email":
-        return RedirectResponse(f"/verify-email?username={username}", status_code=302)
+        query = urlencode({
+            "username": username,
+            "risk_score": risk_score,
+            "reasons": "|".join(reasons)
+        })
+        return RedirectResponse(f"/verify-email?{query}", status_code=302)
     else:  # block
         return templates.TemplateResponse("login_xloc.html", {
             "request": request,

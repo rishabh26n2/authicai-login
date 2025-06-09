@@ -7,7 +7,12 @@ router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
 @router.get("/verify-email", response_class=HTMLResponse)
-async def verify_email(request: Request, username: str = Query(...)):
+async def verify_email(
+    request: Request,
+    username: str = Query(...),
+    risk_score: int = Query(...),
+    reasons: str = Query(None)
+):
     # ✅ Log email verification success
     await insert_log(
         ip_address="verified",
@@ -18,9 +23,15 @@ async def verify_email(request: Request, username: str = Query(...)):
         username=username,
         latitude=None,
         longitude=None,
-        note="Email verification passed"   # ✅ Note added
+        note="Email verification passed"
     )
+
+    reason_list = reasons.split("|") if reasons else []
+
     return templates.TemplateResponse("verify_email.html", {
         "request": request,
-        "token_validated": True
+        "token_validated": True,
+        "username": username,
+        "risk_score": risk_score,
+        "reasons": reason_list
     })

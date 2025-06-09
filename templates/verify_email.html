@@ -11,8 +11,16 @@
         <p style="color:green;">Your email has been successfully verified. You may proceed.</p>
         <script>
           setTimeout(() => {
-            window.location.href = "/";
-          }, 3000); // redirect after 3 seconds
+            const params = new URLSearchParams({
+              message: "{{ username }} authenticated via email verification",
+              location: "verified",
+              risk_score: "{{ risk_score }}",
+              is_suspicious: "false",
+              use_ml: "true",
+              reasons: "{{ reasons | join('|') }}"
+            });
+            window.location.href = "/?" + params.toString();
+          }, 3000);
         </script>
     {% elif error %}
         <p style="color:red;">{{ error }}</p>

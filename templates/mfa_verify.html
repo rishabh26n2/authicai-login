@@ -12,8 +12,12 @@
 
     <form method="post" action="/mfa/verify">
         <input type="hidden" name="username" value="{{ username }}">
+        <input type="hidden" name="risk_score" value="{{ risk_score }}">
+        <input type="hidden" name="reasons" value="{{ reasons | join('|') }}">
+
         <label for="code">Enter the 6-digit code:</label><br>
         <input type="text" id="code" name="code" required><br><br>
+
         <button type="submit">Verify</button>
     </form>
 
