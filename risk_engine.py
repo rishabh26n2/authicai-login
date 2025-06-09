@@ -80,23 +80,32 @@ def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
         reasons = []
 
         if explainer:
-            transformed_df = preprocessor.transform(df)
-            shap_values = explainer.shap_values(transformed_df)
-            values = shap_values[1][0] if isinstance(shap_values, list) else shap_values[0]
-
             try:
-                feature_names = preprocessor.get_feature_names_out()
-            except:
-                feature_names = [f"feature_{i}" for i in range(len(values))]
+                transformed_df = preprocessor.transform(df)
+                if hasattr(transformed_df, "toarray"):
+                    transformed_df = transformed_df.toarray()
 
-            top_contributors = sorted(
-                zip(feature_names, values), key=lambda x: abs(x[1]), reverse=True
-            )[:3]
+                shap_values = explainer.shap_values(transformed_df)
+                values = shap_values[1][0] if isinstance(shap_values, list) else shap_values[0]
 
-            for feat, val in top_contributors:
-                reasons.append(f"{feat} contributed ({val:+.2f})")
+                try:
+                    feature_names = preprocessor.get_feature_names_out()
+                except:
+                    feature_names = [f"feature_{i}" for i in range(len(values))]
+
+                top_contributors = sorted(
+                    zip(feature_names, values), key=lambda x: abs(x[1]), reverse=True
+                )[:3]
+
+                for feat, val in top_contributors:
+                    reasons.append(f"{feat} contributed ({val:+.2f})")
+
+            except Exception as shap_error:
+                print("⚠️ SHAP failed during explanation:", shap_error)
+                reasons.append("SHAP explanation unavailable")
+
         else:
-            reasons.append("SHAP not available")
+            reasons.append("SHAP explainer not initialized")
 
         return int(score), reasons
 
