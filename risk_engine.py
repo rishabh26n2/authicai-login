@@ -20,7 +20,11 @@ except Exception as e:
 explainer = None
 if model:
     try:
-        explainer = shap.Explainer(model)
+        sample_df = pd.DataFrame([{
+            "hour": 12, "weekday": 1, "latitude": 0.0, "longitude": 0.0,
+            "user_agent": "browser", "country": "India", "ip_1": 1.0, "ip_2": 1.0
+        }])
+        explainer = shap.Explainer(model.predict_proba, sample_df)
     except Exception as e:
         print("⚠️ SHAP explainer init failed:", e)
         explainer = None
