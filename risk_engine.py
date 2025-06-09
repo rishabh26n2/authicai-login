@@ -1,3 +1,4 @@
+
 import math
 from datetime import datetime, timezone
 from typing import Optional, Any, List, Tuple
@@ -19,7 +20,6 @@ try:
     preprocessor = model.named_steps['pre']
     classifier = model.named_steps['clf']
 
-    # Sample input for background
     sample_df = pd.DataFrame([{
         "hour": 12,
         "weekday": 1,
@@ -57,6 +57,17 @@ def extract_country(loc_str: str) -> str:
 def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
     try:
         df = pd.DataFrame([features])
+        df = df.astype({
+            "hour": float,
+            "weekday": float,
+            "latitude": float,
+            "longitude": float,
+            "ip_1": float,
+            "ip_2": float,
+            "user_agent": str,
+            "country": str
+        })
+
         score = model.predict_proba(df)[0][1] * 100
         reasons = []
 
@@ -64,7 +75,11 @@ def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
             transformed_df = preprocessor.transform(df)
             shap_values = explainer.shap_values(transformed_df)
             values = shap_values[1][0] if isinstance(shap_values, list) else shap_values[0]
-            feature_names = preprocessor.get_feature_names_out()
+            try:
+                feature_names = preprocessor.get_feature_names_out()
+            except:
+                feature_names = [f"feature_{i}" for i in range(len(values))]
+
             top_contributors = sorted(
                 zip(feature_names, values), key=lambda x: abs(x[1]), reverse=True
             )[:3]
@@ -77,6 +92,8 @@ def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
 
     except Exception as e:
         print("⚠️ ML model prediction failed:", e)
+        print("Feature dtypes:\n", df.dtypes)
+        print("Feature values:\n", df.head())
         return 0, ["ML model failed, fallback to rule-based"]
 
 def calculate_risk_score_rules(
@@ -97,21 +114,22 @@ def calculate_risk_score_rules(
 
     if last_login and curr_coords:
         try:
-            last_ts = last_login["timestamp"]
-            last_lat = last_login["latitude"]
-            last_lon = last_login["longitude"]
-            if last_ts.tzinfo is None:
+            last_ts = last_login["timestamp"] if "timestamp" in last_login else None
+            last_lat = last_login["latitude"] if "latitude" in last_login else None
+            last_lon = last_login["longitude"] if "longitude" in last_login else None
+            if last_ts and last_ts.tzinfo is None:
                 last_ts = last_ts.replace(tzinfo=timezone.utc)
-            hours = max((now - last_ts).total_seconds() / 3600.0, 0.01)
-            dist = haversine(last_lat, last_lon, curr_coords[0], curr_coords[1])
-            speed = dist / hours
-            if speed > 500:
-                score += 50
-                reasons.append(f"Impossible travel detected: {int(speed)} km/h")
+            if last_ts and last_lat is not None and last_lon is not None:
+                hours = max((now - last_ts).total_seconds() / 3600.0, 0.01)
+                dist = haversine(last_lat, last_lon, curr_coords[0], curr_coords[1])
+                speed = dist / hours
+                if speed > 500:
+                    score += 50
+                    reasons.append(f"Impossible travel detected: {int(speed)} km/h")
         except Exception:
             pass
 
-    last_country = extract_country(last_login.get("location", "")) if last_login else None
+    last_country = extract_country(last_login["location"]) if last_login and "location" in last_login else None
     curr_country = extract_country(location)
     if last_country and curr_country and last_country != curr_country:
         score += 20
