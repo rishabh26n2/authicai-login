@@ -57,8 +57,7 @@ def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
         reasons = []
 
         if explainer:
-            transformed = model.named_steps['pre'].transform(df)
-            shap_values = explainer(transformed)
+            shap_values = explainer(df)
             values = shap_values.values[0]
             feature_names = df.columns
             top_contributors = sorted(
