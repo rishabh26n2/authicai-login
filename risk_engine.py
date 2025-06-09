@@ -21,7 +21,7 @@ if model:
         preprocessor = model.named_steps['pre']
         classifier = model.named_steps['clf']
 
-        sample_raw = pd.DataFrame([{
+        background_df = pd.DataFrame([{
             "hour": 12,
             "weekday": 1,
             "latitude": 0.0,
@@ -30,17 +30,15 @@ if model:
             "country": "India",
             "ip_1": 1.0,
             "ip_2": 1.0
-        }])
+        }] * 8)
 
-        sample_transformed = preprocessor.transform(sample_raw)
-
-        explainer = shap.Explainer(classifier, sample_transformed)
+        background_transformed = preprocessor.transform(background_df)
+        explainer = shap.Explainer(classifier, background_transformed)
         print("✅ SHAP explainer initialized")
 
     except Exception as e:
         print("⚠️ SHAP explainer init failed:", e)
         explainer = None
-
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     R = 6371.0
@@ -51,12 +49,10 @@ def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
-
 def extract_country(loc_str: str) -> str:
     if not loc_str or "," not in loc_str:
         return loc_str.strip()
     return loc_str.split(",")[-1].strip()
-
 
 def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
     try:
@@ -82,7 +78,6 @@ def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
     except Exception as e:
         print("⚠️ ML model prediction failed:", e)
         return 0, ["ML model failed, fallback to rule-based"]
-
 
 def calculate_risk_score_rules(
     ip: str,
@@ -153,7 +148,6 @@ def calculate_risk_score_rules(
 
     return min(score, 100), reasons
 
-
 def calculate_risk_score(
     ip: str,
     location: str,
@@ -187,7 +181,6 @@ def calculate_risk_score(
         ip, location, user_agent, last_login, curr_time, curr_coords, login_history, recent_attempts
     )
     return (score, reasons) if return_reasons else score
-
 
 def is_suspicious_login(score: int) -> bool:
     return score >= 50
