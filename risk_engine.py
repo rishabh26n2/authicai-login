@@ -11,14 +11,18 @@ MODEL_PATH = "models/risk_model_v2.pkl"
 try:
     model = joblib.load(MODEL_PATH)
 except Exception as e:
-    print("\u26a0\ufe0f Failed to load ML model:", e)
+    print("⚠️ Failed to load ML model:", e)
     model = None
     USE_ML_MODEL = False
 
 explainer = None
+feature_names_out = None
 if model:
     try:
-        sample_df = pd.DataFrame([{
+        preprocessor = model.named_steps['pre']
+        classifier = model.named_steps['clf']
+
+        sample_raw = pd.DataFrame([{
             "hour": 12,
             "weekday": 1,
             "latitude": 0.0,
@@ -28,10 +32,15 @@ if model:
             "ip_1": 1.0,
             "ip_2": 1.0
         }])
-        explainer = shap.Explainer(model, sample_df)
-        print("\u2705 SHAP explainer initialized")
+
+        sample_transformed = preprocessor.transform(sample_raw)
+        feature_names_out = preprocessor.get_feature_names_out()
+
+        explainer = shap.TreeExplainer(classifier)
+        print("✅ SHAP TreeExplainer initialized")
+
     except Exception as e:
-        print("\u26a0\ufe0f SHAP explainer init failed:", e)
+        print("⚠️ SHAP explainer init failed:", e)
         explainer = None
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -55,11 +64,12 @@ def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
         reasons = []
 
         if explainer:
-            shap_values = explainer(df)
-            values = shap_values.values[0]
-            feature_names = shap_values.feature_names
+            transformed_df = model.named_steps['pre'].transform(df)
+            shap_vals = explainer.shap_values(transformed_df)[1]  # class 1
+            shap_row = shap_vals[0]
+
             top_contributors = sorted(
-                zip(feature_names, values), key=lambda x: abs(x[1]), reverse=True
+                zip(feature_names_out, shap_row), key=lambda x: abs(x[1]), reverse=True
             )[:3]
             for feat, val in top_contributors:
                 reasons.append(f"{feat} contributed ({val:+.2f})")
@@ -69,7 +79,7 @@ def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
         return int(score), reasons
 
     except Exception as e:
-        print("\u26a0\ufe0f ML model prediction failed:", e)
+        print("⚠️ ML model prediction failed:", e)
         return 0, ["ML model failed, fallback to rule-based"]
 
 def calculate_risk_score_rules(
@@ -168,7 +178,7 @@ def calculate_risk_score(
             score, reasons = calculate_risk_score_ml(features)
             return (score, reasons) if return_reasons else score
         except Exception as e:
-            print("\u26a0\ufe0f ML failed, using rules:", e)
+            print("⚠️ ML failed, using rules:", e)
 
     score, reasons = calculate_risk_score_rules(
         ip, location, user_agent, last_login, curr_time, curr_coords, login_history, recent_attempts
