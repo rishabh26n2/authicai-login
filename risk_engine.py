@@ -60,11 +60,14 @@ def extract_country(loc_str: str) -> str:
 def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
     try:
         df = pd.DataFrame([features])
-        score = model.predict_proba(df)[0][1] * 100
+        preprocessor = model.named_steps['pre']
+        classifier = model.named_steps['clf']
+        transformed_df = preprocessor.transform(df)
+
+        score = classifier.predict_proba(transformed_df)[0][1] * 100
         reasons = []
 
         if explainer:
-            transformed_df = model.named_steps['pre'].transform(df)
             shap_vals = explainer.shap_values(transformed_df)[1]  # class 1
             shap_row = shap_vals[0]
 
