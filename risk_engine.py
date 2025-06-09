@@ -30,8 +30,8 @@ if model:
             "ip_1": 1.0,
             "ip_2": 1.0
         }])
-        # Use permutation-based explainer for pipelines
-        explainer = shap.Explainer(model.predict_proba, sample_raw, algorithm="permutation")
+        # Initialize SHAP explainer on the entire pipeline
+        explainer = shap.Explainer(model, sample_raw)
     except Exception as e:
         print("⚠️ SHAP explainer init failed:", e)
         explainer = None
@@ -57,8 +57,7 @@ def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
         reasons = []
 
         if explainer:
-            transformed_df = model.named_steps['pre'].transform(df)
-            shap_values = explainer(transformed_df)
+            shap_values = explainer(df)
             values = shap_values.values[0]
             feature_names = shap_values.feature_names
             top_contributors = sorted(
