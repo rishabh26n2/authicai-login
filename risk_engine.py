@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Optional, Any, List, Tuple
 import joblib
 import pandas as pd
-import shap
+import shap  # ✅ SHAP for explainability
 
 USE_ML_MODEL = True
 MODEL_PATH = "models/risk_model_v2.pkl"
@@ -18,10 +18,7 @@ except Exception as e:
 explainer = None
 if model:
     try:
-        preprocessor = model.named_steps['pre']
-        classifier = model.named_steps['clf']
-
-        background_df = pd.DataFrame([{
+        sample_raw = pd.DataFrame([{
             "hour": 12,
             "weekday": 1,
             "latitude": 0.0,
@@ -30,10 +27,10 @@ if model:
             "country": "India",
             "ip_1": 1.0,
             "ip_2": 1.0
-        }] * 8)
+        }])
 
-        background_transformed = preprocessor.transform(background_df)
-        explainer = shap.Explainer(classifier, background_transformed)
+        # Use model.predict with SHAP for sklearn pipeline
+        explainer = shap.Explainer(model.predict, sample_raw)
         print("✅ SHAP explainer initialized")
 
     except Exception as e:
@@ -61,8 +58,7 @@ def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
         reasons = []
 
         if explainer:
-            transformed_df = model.named_steps['pre'].transform(df)
-            shap_values = explainer(transformed_df)
+            shap_values = explainer(df)
             values = shap_values.values[0]
             feature_names = shap_values.feature_names
             top_contributors = sorted(
