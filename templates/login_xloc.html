@@ -174,15 +174,24 @@
     <p class="{{ 'suspicious-yes' if is_suspicious else 'suspicious-no' }}">
       Suspicious? {{ 'Yes' if is_suspicious else 'No' }}
     </p>
-    
-    <p><strong>Scoring Method:</strong> {{ reasons[0] }}</p>
-    {% if reasons|length > 1 %}
-      <p><strong>Reasons for Risk Score:</strong></p>
-      <ul>
-        {% for reason in reasons[1:] %}
-          <li>{{ reason }}</li>
-        {% endfor %}
-      </ul>
+
+    {% if reasons %}
+      <p><strong>Scoring Method:</strong>
+        {% if 'Scoring:' in reasons[0] %}
+          {{ reasons[0].replace('Scoring: ', '') }}
+        {% else %}
+          Rule-Based
+        {% endif %}
+      </p>
+
+      {% if reasons|length > 1 %}
+        <p><strong>Reasons for Risk Score:</strong></p>
+        <ul>
+          {% for reason in reasons[1:] %}
+            <li>{{ reason }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
     {% endif %}
 
     {% if risk_score < 30 %}
@@ -196,4 +205,3 @@
     {% endif %}
   </div>
 {% endif %}
-
