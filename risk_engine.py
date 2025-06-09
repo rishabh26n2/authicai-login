@@ -34,9 +34,14 @@ if model:
             "ip_1": 1.0,
             "ip_2": 1.0
         }])
-
+        
         sample_transformed = preprocessor.transform(sample_raw)
-        explainer = shap.TreeExplainer(classifier, feature_perturbation="interventional")
+        explainer = shap.TreeExplainer(
+            classifier,
+            data=sample_transformed,
+            feature_perturbation="auto"
+        )
+
         print("\u2705 SHAP TreeExplainer initialized")
 
     except Exception as e:
@@ -60,14 +65,17 @@ def extract_country(loc_str: str) -> str:
 def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
     try:
         df = pd.DataFrame([features])
+        
+        # Run prediction through pipeline (it handles preprocessing)
         score = model.predict_proba(df)[0][1] * 100
         reasons = []
 
-        if explainer and preprocessor:
-            transformed_df = preprocessor.transform(df)
-            shap_values = explainer.shap_values(transformed_df)
-            values = shap_values[1][0]  # class 1 explanation
-            feature_names = explainer.data.feature_names
+        if explainer:
+            # Run only the preprocessor to transform input
+            transformed_df = model.named_steps['pre'].transform(df)
+            shap_values = explainer(transformed_df)
+            values = shap_values.values[0]
+            feature_names = shap_values.feature_names
             top_contributors = sorted(
                 zip(feature_names, values), key=lambda x: abs(x[1]), reverse=True
             )[:3]
@@ -79,7 +87,7 @@ def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
         return int(score), reasons
 
     except Exception as e:
-        print("\u26a0\ufe0f ML model prediction failed:", e)
+        print("⚠️ ML model prediction failed:", e)
         return 0, ["ML model failed, fallback to rule-based"]
 
 def calculate_risk_score_rules(
