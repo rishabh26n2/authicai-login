@@ -1,4 +1,3 @@
-
 import math
 from datetime import datetime, timezone
 from typing import Optional, Any, List, Tuple
@@ -15,6 +14,9 @@ explainer = None
 preprocessor = None
 classifier = None
 
+# =======================
+# Load ML model and SHAP
+# =======================
 try:
     model = joblib.load(MODEL_PATH)
     preprocessor = model.named_steps['pre']
@@ -40,6 +42,9 @@ except Exception as e:
     USE_ML_MODEL = False
     explainer = None
 
+# =======================
+# Utilities
+# =======================
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     R = 6371.0
     φ1, φ2 = math.radians(lat1), math.radians(lat2)
@@ -54,6 +59,9 @@ def extract_country(loc_str: str) -> str:
         return loc_str.strip()
     return loc_str.split(",")[-1].strip()
 
+# =======================
+# ML-based Risk Scoring
+# =======================
 def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
     try:
         df = pd.DataFrame([features])
@@ -75,6 +83,7 @@ def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
             transformed_df = preprocessor.transform(df)
             shap_values = explainer.shap_values(transformed_df)
             values = shap_values[1][0] if isinstance(shap_values, list) else shap_values[0]
+
             try:
                 feature_names = preprocessor.get_feature_names_out()
             except:
@@ -83,6 +92,7 @@ def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
             top_contributors = sorted(
                 zip(feature_names, values), key=lambda x: abs(x[1]), reverse=True
             )[:3]
+
             for feat, val in top_contributors:
                 reasons.append(f"{feat} contributed ({val:+.2f})")
         else:
@@ -92,10 +102,12 @@ def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
 
     except Exception as e:
         print("⚠️ ML model prediction failed:", e)
-        print("Feature dtypes:\n", df.dtypes)
-        print("Feature values:\n", df.head())
+        print("Features passed:", features)
         return 0, ["ML model failed, fallback to rule-based"]
 
+# =======================
+# Rule-based Risk Scoring
+# =======================
 def calculate_risk_score_rules(
     ip: str,
     location: str,
@@ -112,11 +124,13 @@ def calculate_risk_score_rules(
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
 
+    # Impossible travel detection
     if last_login and curr_coords:
         try:
-            last_ts = last_login["timestamp"] if "timestamp" in last_login else None
-            last_lat = last_login["latitude"] if "latitude" in last_login else None
-            last_lon = last_login["longitude"] if "longitude" in last_login else None
+            last_ts = last_login.get("timestamp")
+            last_lat = last_login.get("latitude")
+            last_lon = last_login.get("longitude")
+
             if last_ts and last_ts.tzinfo is None:
                 last_ts = last_ts.replace(tzinfo=timezone.utc)
             if last_ts and last_lat is not None and last_lon is not None:
@@ -129,30 +143,33 @@ def calculate_risk_score_rules(
         except Exception:
             pass
 
-    last_country = extract_country(last_login["location"]) if last_login and "location" in last_login else None
+    # Country change detection
+    last_country = extract_country(last_login.get("location", "")) if last_login else None
     curr_country = extract_country(location)
     if last_country and curr_country and last_country != curr_country:
         score += 20
         reasons.append(f"Country changed: {last_country} → {curr_country}")
 
+    # Location failure
     if "Unknown" in location:
         score += 40
         reasons.append("Location could not be determined")
 
+    # Suspicious user-agent
     ua = user_agent.lower()
     if any(tok in ua for tok in ("curl", "python", "wget")):
         score += 30
         reasons.append(f"Suspicious user-agent: {user_agent}")
 
+    # Time and frequency anomalies
     if login_history:
         hours_hist = [dt.astimezone(timezone.utc).hour for dt in login_history]
         if hours_hist:
-            min_h, max_h = min(hours_hist), max(hours_hist)
-            if now.hour < min_h or now.hour > max_h:
+            if now.hour < min(hours_hist) or now.hour > max(hours_hist):
                 score += 10
                 reasons.append(f"Login at unusual hour: {now.hour}")
         weekdays = [dt.astimezone(timezone.utc).weekday() for dt in login_history]
-        if weekdays and now.weekday() not in set(weekdays):
+        if now.weekday() not in set(weekdays):
             score += 10
             reasons.append("Login on unusual day of week")
 
@@ -166,6 +183,9 @@ def calculate_risk_score_rules(
 
     return min(score, 100), reasons
 
+# =======================
+# Unified Scoring API
+# =======================
 def calculate_risk_score(
     ip: str,
     location: str,
@@ -193,12 +213,16 @@ def calculate_risk_score(
             score, reasons = calculate_risk_score_ml(features)
             return (score, reasons) if return_reasons else score
         except Exception as e:
-            print("⚠️ ML failed, using rules:", e)
+            print("⚠️ ML failed, falling back to rules:", e)
 
+    # Fallback or rule-based scoring
     score, reasons = calculate_risk_score_rules(
         ip, location, user_agent, last_login, curr_time, curr_coords, login_history, recent_attempts
     )
     return (score, reasons) if return_reasons else score
 
+# =======================
+# Flag suspicious score
+# =======================
 def is_suspicious_login(score: int) -> bool:
     return score >= 50
