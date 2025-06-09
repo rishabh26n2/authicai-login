@@ -4,44 +4,41 @@ from typing import Optional, Any, List, Tuple
 import joblib
 import pandas as pd
 import shap
+import numpy as np
 
 USE_ML_MODEL = True
 MODEL_PATH = "models/risk_model_v2.pkl"
 
-try:
-    model = joblib.load(MODEL_PATH)
-except Exception as e:
-    print("\u26a0\ufe0f Failed to load ML model:", e)
-    model = None
-    USE_ML_MODEL = False
-
+model = None
 explainer = None
 preprocessor = None
 classifier = None
 
-if model:
-    try:
-        preprocessor = model.named_steps['pre']
-        classifier = model.named_steps['clf']
+try:
+    model = joblib.load(MODEL_PATH)
+    preprocessor = model.named_steps['pre']
+    classifier = model.named_steps['clf']
 
-        sample_raw = pd.DataFrame([{
-            "hour": 12,
-            "weekday": 1,
-            "latitude": 0.0,
-            "longitude": 0.0,
-            "user_agent": "browser",
-            "country": "India",
-            "ip_1": 1.0,
-            "ip_2": 1.0
-        }])
+    # Sample input for background
+    sample_df = pd.DataFrame([{
+        "hour": 12,
+        "weekday": 1,
+        "latitude": 0.0,
+        "longitude": 0.0,
+        "user_agent": "browser",
+        "country": "India",
+        "ip_1": 1.0,
+        "ip_2": 1.0
+    }])
+    background = preprocessor.transform(sample_df)
+    explainer = shap.TreeExplainer(classifier, background, feature_perturbation="auto")
+    print("✅ SHAP explainer initialized")
 
-        sample_transformed = preprocessor.transform(sample_raw)
-        explainer = shap.TreeExplainer(classifier, data=sample_transformed, feature_perturbation="auto")
-        print("\u2705 SHAP explainer initialized")
-
-    except Exception as e:
-        print("\u26a0\ufe0f SHAP explainer init failed:", e)
-        explainer = None
+except Exception as e:
+    print("⚠️ SHAP explainer init failed:", e)
+    model = None
+    USE_ML_MODEL = False
+    explainer = None
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     R = 6371.0
@@ -60,18 +57,14 @@ def extract_country(loc_str: str) -> str:
 def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
     try:
         df = pd.DataFrame([features])
-        print("🧪 DF content:", df.to_dict(orient='records'))
-        print("🧪 DF types before prediction:", df.dtypes.to_dict())
-
-        # Apply preprocessing manually
-        transformed = preprocessor.transform(df)
-        score = classifier.predict_proba(transformed)[0][1] * 100
+        score = model.predict_proba(df)[0][1] * 100
         reasons = []
 
         if explainer:
-            shap_values = explainer.shap_values(transformed)
-            values = shap_values[1][0] if isinstance(shap_values, list) else shap_values.values[0]
-            feature_names = explainer.data.feature_names if hasattr(explainer.data, 'feature_names') else [f"f{i}" for i in range(len(values))]
+            transformed_df = preprocessor.transform(df)
+            shap_values = explainer.shap_values(transformed_df)
+            values = shap_values[1][0] if isinstance(shap_values, list) else shap_values[0]
+            feature_names = preprocessor.get_feature_names_out()
             top_contributors = sorted(
                 zip(feature_names, values), key=lambda x: abs(x[1]), reverse=True
             )[:3]
@@ -172,10 +165,10 @@ def calculate_risk_score(
             features = {
                 "hour": curr_time.hour,
                 "weekday": curr_time.weekday(),
-                "latitude": float(curr_coords[0]),
-                "longitude": float(curr_coords[1]),
-                "user_agent": str(user_agent),
-                "country": str(extract_country(location)),
+                "latitude": curr_coords[0],
+                "longitude": curr_coords[1],
+                "user_agent": user_agent,
+                "country": extract_country(location),
                 "ip_1": float(ip.split(".")[0]),
                 "ip_2": float(ip.split(".")[1]),
             }
