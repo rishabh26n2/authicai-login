@@ -2,11 +2,9 @@ import math
 from datetime import datetime, timezone
 from typing import Optional, Any, List, Tuple
 import joblib
-import os
 import pandas as pd
-import shap  # ✅ SHAP for explainability
+import shap
 
-# Toggle: switch to ML or fallback to rules
 USE_ML_MODEL = True
 MODEL_PATH = "models/risk_model_v2.pkl"
 
@@ -20,6 +18,9 @@ except Exception as e:
 explainer = None
 if model:
     try:
+        preprocessor = model.named_steps['pre']
+        classifier = model.named_steps['clf']
+
         sample_raw = pd.DataFrame([{
             "hour": 12,
             "weekday": 1,
@@ -30,25 +31,32 @@ if model:
             "ip_1": 1.0,
             "ip_2": 1.0
         }])
-        # Initialize SHAP explainer on the entire pipeline
-        explainer = shap.Explainer(model, sample_raw)
+
+        sample_transformed = preprocessor.transform(sample_raw)
+
+        explainer = shap.Explainer(classifier, sample_transformed)
+        print("✅ SHAP explainer initialized")
+
     except Exception as e:
         print("⚠️ SHAP explainer init failed:", e)
         explainer = None
+
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     R = 6371.0
     φ1, φ2 = math.radians(lat1), math.radians(lat2)
     Δφ = math.radians(lat2 - lat1)
     Δλ = math.radians(lon2 - lon1)
-    a = math.sin(Δφ / 2) ** 2 + math.cos(φ1) * math.cos(φ2) * math.sin(Δλ / 2) ** 2
+    a = math.sin(Δφ / 2)**2 + math.cos(φ1) * math.cos(φ2) * math.sin(Δλ / 2)**2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
+
 
 def extract_country(loc_str: str) -> str:
     if not loc_str or "," not in loc_str:
         return loc_str.strip()
     return loc_str.split(",")[-1].strip()
+
 
 def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
     try:
@@ -57,7 +65,8 @@ def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
         reasons = []
 
         if explainer:
-            shap_values = explainer(df)
+            transformed_df = model.named_steps['pre'].transform(df)
+            shap_values = explainer(transformed_df)
             values = shap_values.values[0]
             feature_names = shap_values.feature_names
             top_contributors = sorted(
@@ -66,13 +75,14 @@ def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
             for feat, val in top_contributors:
                 reasons.append(f"{feat} contributed ({val:+.2f})")
         else:
-            reasons = ["SHAP not available"]
+            reasons.append("SHAP not available")
 
         return int(score), reasons
 
     except Exception as e:
         print("⚠️ ML model prediction failed:", e)
         return 0, ["ML model failed, fallback to rule-based"]
+
 
 def calculate_risk_score_rules(
     ip: str,
@@ -92,27 +102,21 @@ def calculate_risk_score_rules(
 
     if last_login and curr_coords:
         try:
-            last_ts  = last_login["timestamp"]
+            last_ts = last_login["timestamp"]
             last_lat = last_login["latitude"]
             last_lon = last_login["longitude"]
-        except Exception:
-            last_ts = last_lat = last_lon = None
-        if last_ts and last_lat is not None and last_lon is not None:
             if last_ts.tzinfo is None:
                 last_ts = last_ts.replace(tzinfo=timezone.utc)
             hours = max((now - last_ts).total_seconds() / 3600.0, 0.01)
-            dist  = haversine(last_lat, last_lon, curr_coords[0], curr_coords[1])
+            dist = haversine(last_lat, last_lon, curr_coords[0], curr_coords[1])
             speed = dist / hours
             if speed > 500:
                 score += 50
                 reasons.append(f"Impossible travel detected: {int(speed)} km/h")
-
-    last_country = None
-    if last_login:
-        try:
-            last_country = extract_country(last_login["location"])
         except Exception:
             pass
+
+    last_country = extract_country(last_login.get("location", "")) if last_login else None
     curr_country = extract_country(location)
     if last_country and curr_country and last_country != curr_country:
         score += 20
@@ -149,6 +153,7 @@ def calculate_risk_score_rules(
 
     return min(score, 100), reasons
 
+
 def calculate_risk_score(
     ip: str,
     location: str,
@@ -182,6 +187,7 @@ def calculate_risk_score(
         ip, location, user_agent, last_login, curr_time, curr_coords, login_history, recent_attempts
     )
     return (score, reasons) if return_reasons else score
+
 
 def is_suspicious_login(score: int) -> bool:
     return score >= 50
