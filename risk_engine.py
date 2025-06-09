@@ -1,11 +1,10 @@
 import math
 from datetime import datetime, timezone
-from typing import Optional, Any, List
+from typing import Optional, Any, List, Tuple
 import joblib
 import os
 import pandas as pd
 
-# Toggle: switch to ML or fallback to rules
 USE_ML_MODEL = True
 MODEL_PATH = "models/risk_model_v2.pkl"
 
@@ -30,14 +29,14 @@ def extract_country(loc_str: str) -> str:
         return loc_str.strip()
     return loc_str.split(",")[-1].strip()
 
-def calculate_risk_score_ml(features: dict) -> int:
+def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
     try:
         df = pd.DataFrame([features])
-        score = model.predict_proba(df)[0][1] * 100  # Get probability for class 1
-        return int(score)
+        score = model.predict_proba(df)[0][1] * 100
+        return int(score), []  # ML doesn't provide reasons here
     except Exception as e:
         print("⚠️ ML model prediction failed:", e)
-        return 0
+        return 0, ["ML model failed, fallback to rule-based"]
 
 def calculate_risk_score_rules(
     ip: str,
@@ -48,8 +47,9 @@ def calculate_risk_score_rules(
     curr_coords: Optional[tuple] = None,
     login_history: Optional[List[datetime]] = None,
     recent_attempts: Optional[int] = None
-) -> int:
+) -> Tuple[int, List[str]]:
     score = 0
+    reasons = []
     now = curr_time or datetime.now(timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
@@ -69,25 +69,27 @@ def calculate_risk_score_rules(
             speed = dist / hours
             if speed > 500:
                 score += 50
+                reasons.append(f"Impossible travel detected: {int(speed)} km/h")
 
-    last_loc_str = None
+    last_country = None
     if last_login:
         try:
-            last_loc_str = last_login["location"]
+            last_country = extract_country(last_login["location"])
         except Exception:
             pass
-    if last_loc_str:
-        last_country = extract_country(last_loc_str)
-        curr_country = extract_country(location)
-        if last_country and curr_country and last_country != curr_country:
-            score += 20
+    curr_country = extract_country(location)
+    if last_country and curr_country and last_country != curr_country:
+        score += 20
+        reasons.append(f"Country changed: {last_country} → {curr_country}")
 
     if "Unknown" in location:
         score += 40
+        reasons.append("Location could not be determined")
 
     ua = user_agent.lower()
     if any(tok in ua for tok in ("curl", "python", "wget")):
         score += 30
+        reasons.append(f"Suspicious user-agent: {user_agent}")
 
     if login_history:
         hours_hist = [dt.astimezone(timezone.utc).hour for dt in login_history]
@@ -95,17 +97,21 @@ def calculate_risk_score_rules(
             min_h, max_h = min(hours_hist), max(hours_hist)
             if now.hour < min_h or now.hour > max_h:
                 score += 10
+                reasons.append(f"Login at unusual hour: {now.hour}")
         weekdays = [dt.astimezone(timezone.utc).weekday() for dt in login_history]
         if weekdays and now.weekday() not in set(weekdays):
             score += 10
+            reasons.append("Login on unusual day of week")
 
     if recent_attempts is not None:
         if recent_attempts >= 5:
             score += 20
+            reasons.append("Multiple login attempts detected")
         elif recent_attempts >= 3:
             score += 10
+            reasons.append("Login bursts in short period")
 
-    return min(score, 100)
+    return min(score, 100), reasons
 
 def calculate_risk_score(
     ip: str,
@@ -116,8 +122,9 @@ def calculate_risk_score(
     curr_coords: Optional[tuple] = None,
     login_history: Optional[List[datetime]] = None,
     recent_attempts: Optional[int] = None,
-    use_ml: bool = True  # ✅ NEW
-) -> int:
+    use_ml: bool = True,
+    return_reasons: bool = False
+) -> Any:
     if use_ml and model and curr_coords:
         try:
             features = {
@@ -130,13 +137,15 @@ def calculate_risk_score(
                 "ip_1": float(ip.split(".")[0]),
                 "ip_2": float(ip.split(".")[1]),
             }
-            return calculate_risk_score_ml(features)
+            score, reasons = calculate_risk_score_ml(features)
+            return (score, reasons) if return_reasons else score
         except Exception as e:
             print("⚠️ ML failed, using rules:", e)
 
-    return calculate_risk_score_rules(
+    score, reasons = calculate_risk_score_rules(
         ip, location, user_agent, last_login, curr_time, curr_coords, login_history, recent_attempts
     )
+    return (score, reasons) if return_reasons else score
 
 def is_suspicious_login(score: int) -> bool:
     return score >= 50

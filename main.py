@@ -298,7 +298,7 @@ async def login(
     password: str = Form(...),
     latitude: str = Form(None),
     longitude: str = Form(None),
-    use_ml: str = Form("true"),  # ✅ Checkbox toggle
+    use_ml: str = Form("true"),
     request: Request = None
 ):
     # 1) Determine client IP
@@ -326,7 +326,8 @@ async def login(
 
     # 5) Risk score calculation
     now = datetime.utcnow()
-    risk_score = calculate_risk_score(
+    use_ml_bool = (use_ml == "true")
+    risk_score, reasons = calculate_risk_score(
         ip=ip_address,
         location=location,
         user_agent=user_agent,
@@ -335,8 +336,13 @@ async def login(
         curr_coords=curr_coords,
         login_history=login_history,
         recent_attempts=recent_attempts,
-        use_ml=(use_ml == "true")
+        use_ml=use_ml_bool,
+        return_reasons=True
     )
+
+    # ➕ Add scoring method as reason prefix
+    scoring_method = "Scoring: ML" if use_ml_bool else "Scoring: Rule-Based"
+    note_str = " | ".join([scoring_method] + reasons) if reasons else scoring_method
 
     # 6) Policy evaluation
     policy_action = evaluate_policy(risk_score)
@@ -350,7 +356,8 @@ async def login(
         is_suspicious=(policy_action != "allow"),
         username=username,
         latitude=curr_coords[0],
-        longitude=curr_coords[1]
+        longitude=curr_coords[1],
+        note=note_str
     )
 
     # 8) Take action based on policy
@@ -361,7 +368,8 @@ async def login(
             "location": location,
             "risk_score": risk_score,
             "is_suspicious": False,
-            "use_ml": (use_ml == "true")
+            "use_ml": use_ml_bool,
+            "reasons": reasons
         })
     elif policy_action == "challenge":
         return RedirectResponse(f"/challenge-question?username={username}", status_code=302)
@@ -376,6 +384,6 @@ async def login(
             "location": location,
             "risk_score": risk_score,
             "is_suspicious": True,
-            "use_ml": (use_ml == "true")
+            "use_ml": use_ml_bool,
+            "reasons": reasons
         })
-

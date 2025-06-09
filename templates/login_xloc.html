@@ -166,24 +166,33 @@
     });
   </script>
 
-  {% if message %}
-    <div class="result">
-      <p><strong>Welcome {{ message }}!</strong></p>
-      <p>Detected Location: {{ location }}</p>
-      <p>Risk Score: {{ risk_score }}</p>
-      <p class="{{ 'suspicious-yes' if is_suspicious else 'suspicious-no' }}">
-        Suspicious? {{ 'Yes' if is_suspicious else 'No' }}
-      </p>
-      {% if risk_score < 30 %}
-        <p>Action Taken: Password Only</p>
-      {% elif risk_score < 60 %}
-        <p>Action Taken: OTP Verification</p>
-      {% elif risk_score < 80 %}
-        <p>Action Taken: Security Challenge</p>
-      {% else %}
-        <p>Action Taken: Login Blocked</p>
-      {% endif %}
-    </div>
-  {% endif %}
-</body>
-</html>
+{% if message %}
+  <div class="result">
+    <p><strong>Welcome {{ message }}!</strong></p>
+    <p>Detected Location: {{ location }}</p>
+    <p>Risk Score: {{ risk_score }}</p>
+    <p class="{{ 'suspicious-yes' if is_suspicious else 'suspicious-no' }}">
+      Suspicious? {{ 'Yes' if is_suspicious else 'No' }}
+    </p>
+    
+    {% if reasons %}
+      <p><strong>Reasons for Risk Score:</strong></p>
+      <ul>
+        {% for reason in reasons %}
+          <li>{{ reason }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    {% if risk_score < 30 %}
+      <p>Action Taken: Password Only</p>
+    {% elif risk_score < 60 %}
+      <p>Action Taken: OTP Verification</p>
+    {% elif risk_score < 80 %}
+      <p>Action Taken: Security Challenge</p>
+    {% else %}
+      <p>Action Taken: Login Blocked</p>
+    {% endif %}
+  </div>
+{% endif %}
+
