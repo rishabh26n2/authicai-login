@@ -16,14 +16,8 @@ except Exception as e:
     USE_ML_MODEL = False
 
 explainer = None
-preprocessor = None
-classifier = None
-
 if model:
     try:
-        preprocessor = model.named_steps['pre']
-        classifier = model.named_steps['clf']
-
         sample_raw = pd.DataFrame([{
             "hour": 12,
             "weekday": 1,
@@ -34,16 +28,8 @@ if model:
             "ip_1": 1.0,
             "ip_2": 1.0
         }])
-        
-        sample_transformed = preprocessor.transform(sample_raw)
-        explainer = shap.TreeExplainer(
-            classifier,
-            data=sample_transformed,
-            feature_perturbation="auto"
-        )
-
-        print("\u2705 SHAP TreeExplainer initialized")
-
+        explainer = shap.Explainer(model.predict, sample_raw)
+        print("\u2705 SHAP explainer initialized")
     except Exception as e:
         print("\u26a0\ufe0f SHAP explainer init failed:", e)
         explainer = None
@@ -65,15 +51,11 @@ def extract_country(loc_str: str) -> str:
 def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
     try:
         df = pd.DataFrame([features])
-        
-        # Run prediction through pipeline (it handles preprocessing)
         score = model.predict_proba(df)[0][1] * 100
         reasons = []
 
         if explainer:
-            # Run only the preprocessor to transform input
-            transformed_df = model.named_steps['pre'].transform(df)
-            shap_values = explainer(transformed_df)
+            shap_values = explainer(df)
             values = shap_values.values[0]
             feature_names = shap_values.feature_names
             top_contributors = sorted(
@@ -186,7 +168,7 @@ def calculate_risk_score(
             score, reasons = calculate_risk_score_ml(features)
             return (score, reasons) if return_reasons else score
         except Exception as e:
-            print("\u26a0\ufe0f ML failed, using rules:", e)
+            print("⚠️ ML failed, using rules:", e)
 
     score, reasons = calculate_risk_score_rules(
         ip, location, user_agent, last_login, curr_time, curr_coords, login_history, recent_attempts
