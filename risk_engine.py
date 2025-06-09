@@ -11,7 +11,7 @@ MODEL_PATH = "models/risk_model_v2.pkl"
 try:
     model = joblib.load(MODEL_PATH)
 except Exception as e:
-    print("⚠️ Failed to load ML model:", e)
+    print("\u26a0\ufe0f Failed to load ML model:", e)
     model = None
     USE_ML_MODEL = False
 
@@ -37,10 +37,9 @@ if model:
         feature_names_out = preprocessor.get_feature_names_out()
 
         explainer = shap.TreeExplainer(classifier)
-        print("✅ SHAP TreeExplainer initialized")
-
+        print("\u2705 SHAP TreeExplainer initialized")
     except Exception as e:
-        print("⚠️ SHAP explainer init failed:", e)
+        print("\u26a0\ufe0f SHAP explainer init failed:", e)
         explainer = None
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -62,15 +61,14 @@ def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
         df = pd.DataFrame([features])
         preprocessor = model.named_steps['pre']
         classifier = model.named_steps['clf']
-        transformed_df = preprocessor.transform(df)
 
+        transformed_df = preprocessor.transform(df)
         score = classifier.predict_proba(transformed_df)[0][1] * 100
         reasons = []
 
-        if explainer:
-            shap_vals = explainer.shap_values(transformed_df)[1]  # class 1
+        if explainer and feature_names_out is not None:
+            shap_vals = explainer.shap_values(transformed_df)[1]  # class 1 SHAP values
             shap_row = shap_vals[0]
-
             top_contributors = sorted(
                 zip(feature_names_out, shap_row), key=lambda x: abs(x[1]), reverse=True
             )[:3]
@@ -82,7 +80,7 @@ def calculate_risk_score_ml(features: dict) -> Tuple[int, List[str]]:
         return int(score), reasons
 
     except Exception as e:
-        print("⚠️ ML model prediction failed:", e)
+        print("\u26a0\ufe0f ML model prediction failed:", e)
         return 0, ["ML model failed, fallback to rule-based"]
 
 def calculate_risk_score_rules(
