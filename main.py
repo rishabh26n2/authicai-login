@@ -342,8 +342,8 @@ async def login(
 
     # ➕ Add scoring method as reason prefix
     scoring_method = "Scoring: ML" if use_ml_bool else "Scoring: Rule-Based"
-    note_str = " | ".join([scoring_method] + reasons)
-
+    reasons = [scoring_method] + reasons if reasons else [scoring_method]
+    note_str = " | ".join(reasons)
 
     # 6) Policy evaluation
     policy_action = evaluate_policy(risk_score)
