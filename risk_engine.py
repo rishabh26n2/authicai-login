@@ -207,7 +207,12 @@ def calculate_risk_score(
     use_ml: bool = True,
     return_reasons: bool = False
 ) -> Union[int, Tuple[int, List[str], str]]:
-    if use_ml and model and curr_coords:
+    if use_ml and model:
+        # ✅ Handle missing coordinates
+        if not curr_coords:
+            curr_coords = (0.0, 0.0)
+            print("⚠️ No coordinates provided. Using fallback (0.0, 0.0) for ML.")
+
         try:
             features = {
                 "hour": curr_time.hour,
@@ -219,6 +224,7 @@ def calculate_risk_score(
                 "ip_1": float(ip.split(".")[0]),
                 "ip_2": float(ip.split(".")[1]),
             }
+            print("🧠 ML Features:", features)
             score, reasons = calculate_risk_score_ml(features)
             return (score, reasons, "ML") if return_reasons else score
         except Exception as e:
